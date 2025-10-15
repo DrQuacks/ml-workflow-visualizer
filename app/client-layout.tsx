@@ -3,8 +3,11 @@
 import type { ReactNode } from 'react';
 import Sidebar from '@/components/Sidebar';
 import Link from 'next/link';
+import { SidebarProvider, useSidebar } from '@/components/SidebarContext';
 
-export default function ClientLayout({ children }: { children: ReactNode }) {
+function LayoutContent({ children }: { children: ReactNode }) {
+  const { isOpen } = useSidebar();
+
   return (
     <>
       <header className="border-b bg-white fixed top-0 left-0 right-0 z-40">
@@ -21,12 +24,20 @@ export default function ClientLayout({ children }: { children: ReactNode }) {
       
       <Sidebar />
       
-      <main className="pt-16 pl-0 transition-all duration-300">
-        <div className="mx-auto max-w-6xl px-4 py-6 ml-60">
+      <main className={`pt-16 transition-all duration-300 ${isOpen ? 'ml-60' : 'ml-0'}`}>
+        <div className="mx-auto max-w-6xl px-4 py-6">
           {children}
         </div>
       </main>
     </>
+  );
+}
+
+export default function ClientLayout({ children }: { children: ReactNode }) {
+  return (
+    <SidebarProvider>
+      <LayoutContent>{children}</LayoutContent>
+    </SidebarProvider>
   );
 }
 

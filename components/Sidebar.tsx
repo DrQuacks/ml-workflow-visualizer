@@ -1,8 +1,9 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { useSidebar } from './SidebarContext';
 
 interface MenuItem {
   label: string;
@@ -26,7 +27,7 @@ const menuItems: MenuItem[] = [
 ];
 
 export default function Sidebar() {
-  const [isOpen, setIsOpen] = useState(true);
+  const { isOpen, setIsOpen } = useSidebar();
   const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(['Load', 'Prepare']));
   const pathname = usePathname();
 
@@ -44,25 +45,24 @@ export default function Sidebar() {
 
   return (
     <>
-      {/* Toggle Button */}
-      <button
-        onClick={() => setIsOpen(!isOpen)}
-        className="fixed top-20 left-4 z-50 p-2 rounded-lg border bg-white hover:bg-gray-50 shadow-sm"
-        aria-label={isOpen ? 'Close sidebar' : 'Open sidebar'}
-      >
-        <svg
-          className="w-5 h-5"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
+      {/* Show Sidebar Button (when closed) */}
+      {!isOpen && (
+        <button
+          onClick={() => setIsOpen(true)}
+          className="fixed top-20 left-4 z-50 flex items-center gap-1.5 px-2 py-1 text-xs rounded border bg-white hover:bg-gray-50 shadow-sm"
+          aria-label="Open sidebar"
         >
-          {isOpen ? (
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 19l-7-7 7-7m8 14l-7-7 7-7" />
-          ) : (
+          <svg
+            className="w-3 h-3"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 5l7 7-7 7M5 5l7 7-7 7" />
-          )}
-        </svg>
-      </button>
+          </svg>
+          <span>show</span>
+        </button>
+      )}
 
       {/* Sidebar */}
       <aside
@@ -71,6 +71,25 @@ export default function Sidebar() {
         }`}
         style={{ width: '240px' }}
       >
+        {/* Header with Title and Hide Button */}
+        <div className="flex items-center justify-between px-4 pt-2 pb-1">
+          <h2 className="font-semibold text-lg">Tools</h2>
+          <button
+            onClick={() => setIsOpen(false)}
+            className="flex items-center gap-1.5 px-2 py-1 text-xs rounded border bg-white hover:bg-gray-50"
+            aria-label="Close sidebar"
+          >
+            <svg
+              className="w-3 h-3"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 19l-7-7 7-7m8 14l-7-7 7-7" />
+            </svg>
+            <span>hide</span>
+          </button>
+        </div>
         <nav className="p-4 space-y-2">
           {menuItems.map((item) => (
             <div key={item.label}>
