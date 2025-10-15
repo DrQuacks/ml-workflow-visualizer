@@ -1,6 +1,8 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import { useDrag, useDrop } from 'react-dnd';
+import type { Identifier } from 'dnd-core';
 import { useStore } from '@/core/state';
 
 interface SplitConfigProps {
@@ -14,6 +16,95 @@ interface SplitConfigProps {
   }) => void;
 }
 
+interface DraggableRowProps {
+  index: number;
+  splitName: string;
+  percent: number;
+  moveRow: (dragIndex: number, hoverIndex: number) => void;
+  onPercentChange: (splitName: string, value: number) => void;
+}
+
+const DRAG_TYPE = 'SPLIT_ROW';
+
+function DraggableRow({ index, splitName, percent, moveRow, onPercentChange }: DraggableRowProps) {
+  const ref = useRef<HTMLDivElement>(null);
+
+  const [{ handlerId }, drop] = useDrop<
+    { index: number },
+    void,
+    { handlerId: Identifier | null }
+  >({
+    accept: DRAG_TYPE,
+    collect(monitor) {
+      return {
+        handlerId: monitor.getHandlerId(),
+      };
+    },
+    hover(item, monitor) {
+      if (!ref.current) return;
+      
+      const dragIndex = item.index;
+      const hoverIndex = index;
+      
+      if (dragIndex === hoverIndex) return;
+      
+      const hoverBoundingRect = ref.current?.getBoundingClientRect();
+      const hoverMiddleY = (hoverBoundingRect.bottom - hoverBoundingRect.top) / 2;
+      const clientOffset = monitor.getClientOffset();
+      const hoverClientY = clientOffset!.y - hoverBoundingRect.top;
+      
+      if (dragIndex < hoverIndex && hoverClientY < hoverMiddleY) return;
+      if (dragIndex > hoverIndex && hoverClientY > hoverMiddleY) return;
+      
+      moveRow(dragIndex, hoverIndex);
+      item.index = hoverIndex;
+    },
+  });
+
+  const [{ isDragging }, drag, preview] = useDrag({
+    type: DRAG_TYPE,
+    item: () => ({ index }),
+    collect: (monitor) => ({
+      isDragging: monitor.isDragging(),
+    }),
+  });
+
+  preview(drop(ref));
+
+  return (
+    <div
+      ref={ref}
+      data-handler-id={handlerId}
+      className={`flex items-center gap-3 p-3 border rounded bg-white hover:bg-gray-50 ${
+        isDragging ? 'opacity-40' : ''
+      }`}
+    >
+      {/* Drag Handle */}
+      <div ref={drag} className="cursor-ns-resize flex-shrink-0 p-1">
+        <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8h16M4 16h16" />
+        </svg>
+      </div>
+      
+      {/* Split Name */}
+      <span className="text-sm capitalize font-medium w-20 flex-shrink-0">{splitName}</span>
+      
+      {/* Slider */}
+      <input
+        type="range"
+        min="0"
+        max="100"
+        value={percent}
+        onChange={(e) => onPercentChange(splitName, parseInt(e.target.value))}
+        className="flex-1"
+      />
+      
+      {/* Percentage Display */}
+      <span className="text-sm font-medium w-12 text-right flex-shrink-0">{percent}%</span>
+    </div>
+  );
+}
+
 export default function SplitConfig({ onSplit }: SplitConfigProps) {
   const artifacts = useStore(s => s.artifacts);
   const [selectedArtifactId, setSelectedArtifactId] = useState('');
@@ -22,7 +113,6 @@ export default function SplitConfig({ onSplit }: SplitConfigProps) {
   const [validationPercent, setValidationPercent] = useState(0);
   const [testPercent, setTestPercent] = useState(20);
   const [splitOrder, setSplitOrder] = useState(['train', 'test']);
-  const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
 
   // Get all table artifacts
   const tableArtifacts = Object.values(artifacts).filter(a => a.type === 'table');
@@ -50,57 +140,55 @@ export default function SplitConfig({ onSplit }: SplitConfigProps) {
 
   const handlePercentChange = (splitName: string, value: number) => {
     const newValue = Math.max(0, Math.min(100, value));
-    const currentOrder = includeValidation ? ['train', 'validation', 'test'] : ['train', 'test'];
-    const currentIndex = currentOrder.indexOf(splitName);
     
-    if (splitName === 'train') {
-      const oldTrain = trainPercent;
-      const diff = newValue - oldTrain;
-      setTrainPercent(newValue);
+    // Get current percentages
+    const percentages: Record<string, number> = {
+      train: trainPercent,
+      validation: validationPercent,
+      test: testPercent,
+    };
+    
+    const oldValue = percentages[splitName];
+    const diff = newValue - oldValue;
+    
+    // Update the changed split
+    percentages[splitName] = newValue;
+    
+    // Now distribute the diff across other splits
+    if (diff !== 0) {
+      const currentIndex = splitOrder.indexOf(splitName);
+      let remaining = diff;
       
-      if (includeValidation) {
-        setValidationPercent(Math.max(0, validationPercent - diff));
-      } else {
-        setTestPercent(Math.max(0, testPercent - diff));
+      // Try to borrow/add to splits on the right first
+      for (let i = currentIndex + 1; i < splitOrder.length && remaining !== 0; i++) {
+        const targetSplit = splitOrder[i];
+        const available = percentages[targetSplit];
+        const take = Math.min(available, Math.abs(remaining)) * Math.sign(remaining);
+        percentages[targetSplit] -= take;
+        remaining -= take;
       }
-    } else if (splitName === 'validation') {
-      const oldVal = validationPercent;
-      const diff = newValue - oldVal;
-      setValidationPercent(newValue);
-      setTestPercent(Math.max(0, testPercent - diff));
-    } else if (splitName === 'test') {
-      const oldTest = testPercent;
-      const diff = newValue - oldTest;
-      setTestPercent(newValue);
       
-      if (includeValidation) {
-        setValidationPercent(Math.max(0, validationPercent - diff));
-      } else {
-        setTrainPercent(Math.max(0, trainPercent - diff));
+      // If still have remaining, try splits on the left
+      for (let i = currentIndex - 1; i >= 0 && remaining !== 0; i--) {
+        const targetSplit = splitOrder[i];
+        const available = percentages[targetSplit];
+        const take = Math.min(available, Math.abs(remaining)) * Math.sign(remaining);
+        percentages[targetSplit] -= take;
+        remaining -= take;
       }
     }
-  };
-
-  const handleDragStart = (index: number) => {
-    setDraggedIndex(index);
-  };
-
-  const handleDragOver = (e: React.DragEvent) => {
-    e.preventDefault();
-  };
-
-  const handleDrop = (dropIndex: number) => {
-    if (draggedIndex === null) return;
     
-    const newOrder = [...splitOrder];
-    const [removed] = newOrder.splice(draggedIndex, 1);
-    newOrder.splice(dropIndex, 0, removed);
-    setSplitOrder(newOrder);
-    setDraggedIndex(null);
+    // Apply the new percentages
+    setTrainPercent(Math.max(0, percentages.train));
+    setValidationPercent(Math.max(0, percentages.validation));
+    setTestPercent(Math.max(0, percentages.test));
   };
 
-  const handleDragEnd = () => {
-    setDraggedIndex(null);
+  const moveRow = (dragIndex: number, hoverIndex: number) => {
+    const newOrder = [...splitOrder];
+    const [removed] = newOrder.splice(dragIndex, 1);
+    newOrder.splice(hoverIndex, 0, removed);
+    setSplitOrder(newOrder);
   };
 
   const handleSplit = () => {
@@ -174,47 +262,14 @@ export default function SplitConfig({ onSplit }: SplitConfigProps) {
               : testPercent;
             
             return (
-              <div
+              <DraggableRow
                 key={splitName}
-                draggable={draggedIndex === index}
-                onDragStart={() => handleDragStart(index)}
-                onDragEnd={handleDragEnd}
-                onDragOver={handleDragOver}
-                onDrop={() => handleDrop(index)}
-                className="flex items-center gap-3 p-3 border rounded bg-white hover:bg-gray-50"
-              >
-                {/* Drag Handle */}
-                <div
-                  onMouseDown={() => setDraggedIndex(index)}
-                  onMouseUp={() => {}}
-                  className="cursor-ns-resize flex-shrink-0"
-                >
-                  <svg 
-                    className="w-4 h-4 text-gray-400"
-                    fill="none" 
-                    stroke="currentColor" 
-                    viewBox="0 0 24 24"
-                  >
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8h16M4 16h16" />
-                  </svg>
-                </div>
-                
-                {/* Split Name */}
-                <span className="text-sm capitalize font-medium w-20 flex-shrink-0">{splitName}</span>
-                
-                {/* Slider */}
-                <input
-                  type="range"
-                  min="0"
-                  max="100"
-                  value={percent}
-                  onChange={(e) => handlePercentChange(splitName, parseInt(e.target.value))}
-                  className="flex-1"
-                />
-                
-                {/* Percentage Display */}
-                <span className="text-sm font-medium w-12 text-right flex-shrink-0">{percent}%</span>
-              </div>
+                index={index}
+                splitName={splitName}
+                percent={percent}
+                moveRow={moveRow}
+                onPercentChange={handlePercentChange}
+              />
             );
           })}
         </div>

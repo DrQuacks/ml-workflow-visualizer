@@ -1,6 +1,8 @@
 'use client';
 
 import { useState } from 'react';
+import { DndProvider } from 'react-dnd';
+import { HTML5Backend } from 'react-dnd-html5-backend';
 import { useStore } from '@/core/state';
 import SplitConfig from '@/components/SplitConfig';
 import Inspector from '@/components/Inspector';
@@ -41,11 +43,12 @@ export default function SplitPage() {
   };
 
   return (
-    <div className="space-y-6">
-      <section className="rounded-2xl border bg-white p-4">
-        <h2 className="text-base font-semibold mb-2">Configure Train/Test Split</h2>
-        <SplitConfig onSplit={handleSplit} />
-      </section>
+    <DndProvider backend={HTML5Backend}>
+      <div className="space-y-6">
+        <section className="rounded-2xl border bg-white p-4">
+          <h2 className="text-base font-semibold mb-2">Configure Train/Test Split</h2>
+          <SplitConfig onSplit={handleSplit} />
+        </section>
 
       {node && (
         <>
@@ -90,6 +93,7 @@ export default function SplitPage() {
           Configure and execute a split to see results.
         </p>
       )}
-    </div>
+      </div>
+    </DndProvider>
   );
 }
