@@ -117,7 +117,7 @@ export default function Sidebar() {
                   {item.children.map((child) => (
                     <Link
                       key={child.href}
-                      href={child.href!}
+                      href={(child.href || '/') as any}
                       className={`block px-3 py-2 text-sm rounded-lg ${
                         pathname === child.href
                           ? 'bg-gray-900 text-white'
