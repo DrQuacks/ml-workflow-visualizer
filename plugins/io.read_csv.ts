@@ -41,6 +41,13 @@ export const ReadCSV: OpDefinition<P> = {
 
 export function createReadCsvNode(filename: string): OpNode {
   const id = crypto.randomUUID();
+  const params = {
+    filename,
+    delimiter: ',',
+    header: true,
+    encoding: 'utf-8'
+  };
+  
   const node: OpNode = {
     id,
     op: 'pandas.read_csv',
@@ -53,7 +60,7 @@ export function createReadCsvNode(filename: string): OpNode {
     ],
     inputs: [],
     outputs: [],
-    code: { language: 'python', text: 'import pandas as pd\ndf = pd.read_csv(...)' },
+    code: ReadCSV.codegen(params), // Generate proper code immediately
     status: 'idle'
   };
   return node;

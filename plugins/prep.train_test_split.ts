@@ -151,6 +151,15 @@ export const TrainTestSplit: OpDefinition<P> = {
 
 export function createTrainTestSplitNode(sourceArtifactId: string): OpNode {
   const id = crypto.randomUUID();
+  const params = {
+    sourceArtifactId,
+    includeValidation: false,
+    trainPercent: 80,
+    validationPercent: 0,
+    testPercent: 20,
+    splitOrder: ['train', 'test']
+  };
+  
   const node: OpNode = {
     id,
     op: 'pandas.train_test_split',
@@ -165,7 +174,7 @@ export function createTrainTestSplitNode(sourceArtifactId: string): OpNode {
     ],
     inputs: [sourceArtifactId],
     outputs: [],
-    code: { language: 'python', text: 'import pandas as pd\n# Split will be generated...' },
+    code: TrainTestSplit.codegen(params), // Generate proper code immediately
     status: 'idle'
   };
   return node;

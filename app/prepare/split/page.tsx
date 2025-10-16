@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { DndProvider } from 'react-dnd';
 import { HTML5Backend } from 'react-dnd-html5-backend';
 import { useStore } from '@/core/state';
@@ -14,9 +14,38 @@ import '@/plugins/prep.train_test_split';
 
 export default function SplitPage() {
   const [splitNodeId, setSplitNodeId] = useState<string | null>(null);
+  const [csvData, setCsvData] = useState<string | undefined>(undefined);
   const addNode = useStore(s => s.addNode);
   const node = useStore(s => s.workflow.nodes.find(n => n.id === splitNodeId));
   const artifacts = useStore(s => s.artifacts);
+
+  // Get source CSV data for Python execution
+  useEffect(() => {
+    const loadCsvData = async () => {
+      if (!node) return;
+      const sourceArtifactIdParam = node.params.find(p => p.key === 'sourceArtifactId');
+      if (!sourceArtifactIdParam) return;
+      
+      const sourceArtifact = artifacts[sourceArtifactIdParam.value as string];
+      if (!sourceArtifact) return;
+
+      // Try to get the original file
+      const allNodes = useStore.getState().workflow.nodes;
+      const csvNode = allNodes.find(n => n.op === 'pandas.read_csv');
+      if (csvNode) {
+        const filenameParam = csvNode.params.find(p => p.key === 'filename');
+        if (filenameParam) {
+          const file = window.__fileMap?.get(filenameParam.value as string);
+          if (file) {
+            const text = await file.text();
+            setCsvData(text);
+          }
+        }
+      }
+    };
+
+    loadCsvData();
+  }, [node, artifacts]);
 
   const handleSplit = async (config: {
     sourceArtifactId: string;
@@ -59,13 +88,17 @@ export default function SplitPage() {
             </div>
             <div className="rounded-2xl border bg-white p-4">
               <h3 className="font-semibold mb-2">Generated Code (Python)</h3>
-              <CodeBlock code={node.code.text} />
+              <CodeBlock 
+                code={node.code.text}
+                editable={true}
+                csvData={csvData}
+              />
             </div>
           </section>
 
           {node.outputs.length > 0 && (
             <section className="space-y-4">
-              <h3 className="font-semibold">Split Results</h3>
+              <h3 className="font-semibold">Split Results (JavaScript Preview)</h3>
               <div className="grid gap-4">
                 {node.outputs.map((artifactId, idx) => {
                   const artifact = artifacts[artifactId];
