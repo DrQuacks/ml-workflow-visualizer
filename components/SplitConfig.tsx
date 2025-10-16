@@ -107,6 +107,7 @@ function DraggableRow({ index, splitName, percent, moveRow, onPercentChange }: D
 
 export default function SplitConfig({ onSplit }: SplitConfigProps) {
   const artifacts = useStore(s => s.artifacts);
+  const createdDataframes = useStore(s => s.createdDataframes);
   const [selectedArtifactId, setSelectedArtifactId] = useState('');
   const [includeValidation, setIncludeValidation] = useState(false);
   const [trainPercent, setTrainPercent] = useState(80);
@@ -117,12 +118,12 @@ export default function SplitConfig({ onSplit }: SplitConfigProps) {
   // Get all table artifacts
   const tableArtifacts = Object.values(artifacts).filter(a => a.type === 'table');
 
-  // Auto-select first artifact if available
+  // Auto-select first dataframe if available
   useEffect(() => {
-    if (tableArtifacts.length > 0 && !selectedArtifactId) {
-      setSelectedArtifactId(tableArtifacts[0].id);
+    if (createdDataframes.length > 0 && !selectedArtifactId) {
+      setSelectedArtifactId(createdDataframes[0].name);
     }
-  }, [tableArtifacts, selectedArtifactId]);
+  }, [createdDataframes, selectedArtifactId]);
 
   // Update split order when validation is toggled
   useEffect(() => {
@@ -195,7 +196,7 @@ export default function SplitConfig({ onSplit }: SplitConfigProps) {
     if (!selectedArtifactId) return;
     
     onSplit({
-      sourceArtifactId: selectedArtifactId,
+      sourceArtifactId: selectedArtifactId, // Now this is the DataFrame variable name, not artifact ID
       includeValidation,
       trainPercent,
       validationPercent,
@@ -211,23 +212,20 @@ export default function SplitConfig({ onSplit }: SplitConfigProps) {
       {/* Dataframe Selection */}
       <div>
         <label className="block text-sm font-medium mb-2">Select Source Dataframe</label>
-        {tableArtifacts.length === 0 ? (
-          <p className="text-sm text-gray-600">No dataframes available. Please load a CSV first.</p>
+        {createdDataframes.length === 0 ? (
+          <p className="text-sm text-gray-600">No dataframes available. Please load a CSV first using Run Python.</p>
         ) : (
           <select
             value={selectedArtifactId}
             onChange={(e) => setSelectedArtifactId(e.target.value)}
             className="w-full border rounded px-3 py-2 text-sm"
           >
-            {tableArtifacts.map((artifact) => {
-              const rows = (artifact.payload as any)?.rows || [];
-              const rowCount = Math.max(0, rows.length - 1); // exclude header
-              return (
-                <option key={artifact.id} value={artifact.id}>
-                  Dataframe ({rowCount} rows)
-                </option>
-              );
-            })}
+            <option value="">Select a dataframe...</option>
+            {createdDataframes.map((df) => (
+              <option key={df.name} value={df.name}>
+                {df.name} ({df.sourceFile}, {df.rowCount} rows)
+              </option>
+            ))}
           </select>
         )}
       </div>

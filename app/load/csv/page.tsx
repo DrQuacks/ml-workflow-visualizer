@@ -3,6 +3,7 @@
 import React from 'react';
 import UploadDropzone from '@/components/UploadDropzone';
 import UploadedFilesList from '@/components/UploadedFilesList';
+import CreatedDataframesList from '@/components/CreatedDataframesList';
 import FileInspector from '@/components/FileInspector';
 import { useStore } from '@/core/state';
 
@@ -28,10 +29,13 @@ export default function LoadCsvPage() {
       </section>
 
       {uploadedFiles.length > 0 && (
-        <UploadedFilesList 
-          selectedFile={selectedFile}
-          onSelectFile={setSelectedFile}
-        />
+        <section className="grid md:grid-cols-2 gap-6">
+          <UploadedFilesList 
+            selectedFile={selectedFile}
+            onSelectFile={setSelectedFile}
+          />
+          <CreatedDataframesList />
+        </section>
       )}
 
       {selectedFile && (

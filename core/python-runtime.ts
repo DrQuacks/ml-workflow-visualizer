@@ -173,6 +173,20 @@ json.dumps(_results)
   }
 }
 
+export async function deleteVariable(varName: string): Promise<void> {
+  if (!pyodideInstance) return;
+  
+  try {
+    await pyodideInstance.runPythonAsync(`
+if '${varName}' in globals():
+    del globals()['${varName}']
+    print(f"[Pyodide] Deleted variable: ${varName}")
+`);
+  } catch (error) {
+    console.error(`Failed to delete variable ${varName}:`, error);
+  }
+}
+
 export function resetPyodide() {
   pyodideInstance = null;
   isInitializing = false;

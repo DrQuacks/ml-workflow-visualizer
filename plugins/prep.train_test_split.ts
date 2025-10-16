@@ -3,7 +3,7 @@ import type { OpNode } from '@/core/types';
 import { registry } from '@/core/registry';
 
 type P = {
-  sourceArtifactId: string;
+  sourceArtifactId: string; // Now this is the DataFrame variable name (e.g., "df")
   includeValidation: boolean;
   trainPercent: number;
   validationPercent: number;
@@ -28,9 +28,11 @@ export const TrainTestSplit: OpDefinition<P> = {
   codegen: (p) => {
     const lines = ['import pandas as pd', ''];
     
+    const sourceVar = p.sourceArtifactId || 'df'; // Use the variable name from selection
+    
     // Get the total rows
-    lines.push('# Assuming df is your source dataframe');
-    lines.push('total_rows = len(df)');
+    lines.push(`# Split ${sourceVar} into train/test sets`);
+    lines.push(`total_rows = len(${sourceVar})`);
     lines.push('');
     
     // Calculate split indices based on order
@@ -84,9 +86,9 @@ export const TrainTestSplit: OpDefinition<P> = {
     order.forEach((splitName) => {
       const indices = indexVars[splitName];
       if (indices.end === 'None') {
-        lines.push(`${splitName}_df = df.iloc[${indices.start}:]`);
+        lines.push(`${splitName}_df = ${sourceVar}.iloc[${indices.start}:]`);
       } else {
-        lines.push(`${splitName}_df = df.iloc[${indices.start}:${indices.end}]`);
+        lines.push(`${splitName}_df = ${sourceVar}.iloc[${indices.start}:${indices.end}]`);
       }
     });
     
@@ -96,6 +98,14 @@ export const TrainTestSplit: OpDefinition<P> = {
     };
   },
   preview: async (p, ctx) => {
+    // Note: Preview is now less relevant since we're using Python execution
+    // This is here for backward compatibility but won't be called in new workflow
+    ctx.log('Split preview called - consider using Python execution instead');
+    
+    // Return empty artifacts - actual split happens in Python
+    return { artifacts: [] };
+    
+    /* Legacy code for JavaScript preview:
     const sourceArtifact = ctx.getArtifact(p.sourceArtifactId) as any;
     if (!sourceArtifact || !sourceArtifact.payload?.rows) {
       ctx.log('Source artifact not found or invalid');
@@ -145,7 +155,7 @@ export const TrainTestSplit: OpDefinition<P> = {
       artifacts.push({ id, type: 'table', payload: { rows: splitData[splitName].slice(0, 101) } });
     });
     
-    return { artifacts };
+    return { artifacts }; */
   },
 };
 

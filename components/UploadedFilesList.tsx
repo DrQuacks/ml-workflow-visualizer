@@ -29,7 +29,7 @@ export default function UploadedFilesList({ selectedFile, onSelectFile }: Upload
   return (
     <div className="rounded-2xl border bg-white p-4">
       <h3 className="text-sm font-semibold mb-3">
-        Uploaded Files ({uploadedFiles.length})
+        Uploaded CSV Files ({uploadedFiles.length})
       </h3>
       <div className="space-y-2">
         {uploadedFiles.map((filename) => {

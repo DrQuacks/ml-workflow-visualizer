@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import PythonCodeEditor from './PythonCodeEditor';
 import { executeCode, isPyodideReady } from '@/core/python-runtime';
+import { useStore } from '@/core/state';
 
 interface PythonExecutorProps {
   initialCode: string;
@@ -17,6 +18,7 @@ export default function PythonExecutor({ initialCode, csvData, filename }: Pytho
   const [results, setResults] = useState<Record<string, any> | null>(null);
   const [executionTime, setExecutionTime] = useState<number | null>(null);
   const [isMounted, setIsMounted] = useState(false);
+  const addCreatedDataframe = useStore(s => s.addCreatedDataframe);
 
   // Ensure component only renders on client
   useEffect(() => {
@@ -44,6 +46,17 @@ export default function PythonExecutor({ initialCode, csvData, filename }: Pytho
       const endTime = performance.now();
       setExecutionTime(endTime - startTime);
       setResults(output);
+      
+      // Save DataFrame metadata to state
+      Object.entries(output).forEach(([name, value]: [string, any]) => {
+        if (value && value.type === 'dataframe') {
+          addCreatedDataframe({
+            name,
+            sourceFile: filename || 'unknown',
+            rowCount: value.shape[0],
+          });
+        }
+      });
     } catch (err: any) {
       setError(err.message || 'An error occurred during execution');
     } finally {

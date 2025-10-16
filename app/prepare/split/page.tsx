@@ -5,49 +5,23 @@ import { DndProvider } from 'react-dnd';
 import { HTML5Backend } from 'react-dnd-html5-backend';
 import { useStore } from '@/core/state';
 import SplitConfig from '@/components/SplitConfig';
-import Inspector from '@/components/Inspector';
-import TablePreview from '@/components/TablePreview';
 import CodeBlock from '@/components/CodeBlock';
-import { createTrainTestSplitNode } from '@/plugins/prep.train_test_split';
+import { TrainTestSplit } from '@/plugins/prep.train_test_split';
 // Import to register the plugin
 import '@/plugins/prep.train_test_split';
 
 export default function SplitPage() {
-  const [splitNodeId, setSplitNodeId] = useState<string | null>(null);
-  const [csvData, setCsvData] = useState<string | undefined>(undefined);
-  const addNode = useStore(s => s.addNode);
-  const node = useStore(s => s.workflow.nodes.find(n => n.id === splitNodeId));
-  const artifacts = useStore(s => s.artifacts);
+  const [selectedDataframeName, setSelectedDataframeName] = useState<string>('');
+  const [splitParams, setSplitParams] = useState({
+    includeValidation: false,
+    trainPercent: 80,
+    validationPercent: 0,
+    testPercent: 20,
+    splitOrder: ['train', 'test']
+  });
+  const createdDataframes = useStore(s => s.createdDataframes);
 
-  // Get source CSV data for Python execution
-  useEffect(() => {
-    const loadCsvData = async () => {
-      if (!node) return;
-      const sourceArtifactIdParam = node.params.find(p => p.key === 'sourceArtifactId');
-      if (!sourceArtifactIdParam) return;
-      
-      const sourceArtifact = artifacts[sourceArtifactIdParam.value as string];
-      if (!sourceArtifact) return;
-
-      // Try to get the original file
-      const allNodes = useStore.getState().workflow.nodes;
-      const csvNode = allNodes.find(n => n.op === 'pandas.read_csv');
-      if (csvNode) {
-        const filenameParam = csvNode.params.find(p => p.key === 'filename');
-        if (filenameParam) {
-          const file = window.__fileMap?.get(filenameParam.value as string);
-          if (file) {
-            const text = await file.text();
-            setCsvData(text);
-          }
-        }
-      }
-    };
-
-    loadCsvData();
-  }, [node, artifacts]);
-
-  const handleSplit = async (config: {
+  const handleSplit = (config: {
     sourceArtifactId: string;
     includeValidation: boolean;
     trainPercent: number;
@@ -55,21 +29,37 @@ export default function SplitPage() {
     testPercent: number;
     splitOrder: string[];
   }) => {
-    const newNode = createTrainTestSplitNode(config.sourceArtifactId);
-    
-    // Update node params with config
-    newNode.params = [
-      { key: 'sourceArtifactId', label: 'Source Data', value: config.sourceArtifactId },
-      { key: 'includeValidation', label: 'Include Validation', value: config.includeValidation },
-      { key: 'trainPercent', label: 'Train %', value: config.trainPercent },
-      { key: 'validationPercent', label: 'Validation %', value: config.validationPercent },
-      { key: 'testPercent', label: 'Test %', value: config.testPercent },
-      { key: 'splitOrder', label: 'Split Order', value: config.splitOrder },
-    ];
-    
-    await addNode(newNode);
-    setSplitNodeId(newNode.id);
+    setSelectedDataframeName(config.sourceArtifactId);
+    setSplitParams(config);
   };
+
+  // Generate Python code for split
+  const splitCode = selectedDataframeName ? TrainTestSplit.codegen({
+    sourceArtifactId: selectedDataframeName,
+    includeValidation: splitParams.includeValidation,
+    trainPercent: splitParams.trainPercent,
+    validationPercent: splitParams.validationPercent,
+    testPercent: splitParams.testPercent,
+    splitOrder: splitParams.splitOrder,
+  }).text : '';
+
+  // Get source file for the selected dataframe
+  const sourceDataframe = createdDataframes.find(df => df.name === selectedDataframeName);
+  const sourceFile = sourceDataframe?.sourceFile;
+  
+  const [csvData, setCsvData] = useState<string | undefined>(undefined);
+
+  useEffect(() => {
+    const loadCsvData = async () => {
+      if (!sourceFile) return;
+      const file = window.__fileMap?.get(sourceFile);
+      if (file) {
+        const text = await file.text();
+        setCsvData(text);
+      }
+    };
+    loadCsvData();
+  }, [sourceFile]);
 
   return (
     <DndProvider backend={HTML5Backend}>
@@ -79,52 +69,19 @@ export default function SplitPage() {
           <SplitConfig onSplit={handleSplit} />
         </section>
 
-      {node && (
-        <>
-          <section className="grid md:grid-cols-2 gap-6">
-            <div className="rounded-2xl border bg-white p-4">
-              <h3 className="font-semibold mb-3">Inspector</h3>
-              <Inspector nodeId={node.id} />
-            </div>
-            <div className="rounded-2xl border bg-white p-4">
-              <h3 className="font-semibold mb-2">Generated Code (Python)</h3>
-              <CodeBlock 
-                code={node.code.text}
-                editable={true}
-                csvData={csvData}
-              />
-            </div>
-          </section>
-
-          {node.outputs.length > 0 && (
-            <section className="space-y-4">
-              <h3 className="font-semibold">Split Results (JavaScript Preview)</h3>
-              <div className="grid gap-4">
-                {node.outputs.map((artifactId, idx) => {
-                  const artifact = artifacts[artifactId];
-                  const splitName = (artifact?.payload as any)?.splitName || `Split ${idx + 1}`;
-                  const rows = (artifact?.payload as any)?.rows || [];
-                  const rowCount = Math.max(0, rows.length - 1);
-                  
-                  return (
-                    <div key={artifactId} className="rounded-2xl border bg-white p-4">
-                      <h4 className="font-semibold mb-2 capitalize">
-                        {splitName} ({rowCount} rows)
-                      </h4>
-                      <TablePreview artifactId={artifactId} />
-                    </div>
-                  );
-                })}
-              </div>
-            </section>
-          )}
-        </>
-      )}
-
-      {!node && (
-        <p className="text-sm text-gray-600">
-          Configure and execute a split to see results.
-        </p>
+      {selectedDataframeName && splitCode && (
+        <section className="rounded-2xl border bg-white p-4">
+          <h3 className="font-semibold mb-2">Python Code</h3>
+          <p className="text-xs text-gray-500 mb-3">
+            Configure split above, then click "Run Python" to execute the split.
+          </p>
+          <CodeBlock 
+            code={splitCode}
+            editable={true}
+            csvData={csvData}
+            filename={sourceFile}
+          />
+        </section>
       )}
       </div>
     </DndProvider>
