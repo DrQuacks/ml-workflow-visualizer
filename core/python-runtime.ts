@@ -113,6 +113,7 @@ export async function executeCode(options: ExecuteCodeOptions): Promise<any> {
       return Array.from(assignments);
     };
 
+    console.log('[Pyodide] Code to execute:', code);
     const assignedVars = parseAssignments(code);
     console.log('[Pyodide] Variables assigned in code:', assignedVars);
 
@@ -131,12 +132,17 @@ _assigned_vars = ${JSON.stringify(assignedVars)}
 _results = {}
 _namespace = globals().copy()
 
+print(f"[Debug] Looking for variables: {_assigned_vars}")
+print(f"[Debug] Available in namespace: {list(_namespace.keys())}")
+
 for _key in _assigned_vars:
     if _key in _namespace:
         _value = _namespace[_key]
+        print(f"[Debug] Checking {_key}, type: {type(_value)}")
         
         # Only process DataFrames
         if isinstance(_value, pd.DataFrame):
+            print(f"[Debug] {_key} is a DataFrame with shape {_value.shape}")
             # Convert DataFrame to dict with 'split' orientation for easier JS consumption
             # Replace NaN with None (converts to null in JSON)
             _df_clean = _value.head(100).replace({np.nan: None})
@@ -147,7 +153,12 @@ for _key in _assigned_vars:
                 'data': _df_dict['data'],
                 'shape': list(_value.shape)
             }
+        else:
+            print(f"[Debug] {_key} is not a DataFrame")
+    else:
+        print(f"[Debug] {_key} not found in namespace")
 
+print(f"[Debug] Final results: {list(_results.keys())}")
 json.dumps(_results)
 `;
 

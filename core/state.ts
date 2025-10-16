@@ -7,10 +7,13 @@ type Dict<T> = Record<string, T>;
 interface Store {
   workflow: Workflow;
   artifacts: Dict<ArtifactRef>;
+  uploadedFiles: string[];
   setArtifacts: (patch: Dict<ArtifactRef>) => void;
   setWorkflow: (w: Workflow) => void;
   addNode: (n: OpNode) => Promise<void>;
   updateNode: (id: string, patch: Partial<OpNode>) => void;
+  addUploadedFile: (filename: string) => void;
+  removeUploadedFile: (filename: string) => void;
 }
 
 export const useStore = create<Store>((set, get) => ({
@@ -24,8 +27,15 @@ export const useStore = create<Store>((set, get) => ({
     version: 1,
   },
   artifacts: {},
+  uploadedFiles: [],
   setArtifacts: (patch) => set(s => ({ artifacts: { ...s.artifacts, ...patch } })),
   setWorkflow: (w) => set({ workflow: w }),
+  addUploadedFile: (filename) => set(s => ({ 
+    uploadedFiles: s.uploadedFiles.includes(filename) ? s.uploadedFiles : [...s.uploadedFiles, filename] 
+  })),
+  removeUploadedFile: (filename) => set(s => ({ 
+    uploadedFiles: s.uploadedFiles.filter(f => f !== filename) 
+  })),
   addNode: async (n) => {
     set(s => ({ workflow: { ...s.workflow, nodes: [...s.workflow.nodes, n], updatedAt: new Date().toISOString() } }));
     const op = registry.ops.get(n.op);

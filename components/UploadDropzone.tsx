@@ -2,7 +2,6 @@
 
 import { useRef } from 'react';
 import { useStore } from '@/core/state';
-import { createReadCsvNode } from '@/plugins/io.read_csv';
 
 declare global {
   interface Window { __fileMap?: Map<string, File>; }
@@ -10,7 +9,7 @@ declare global {
 
 export default function UploadDropzone() {
   const inputRef = useRef<HTMLInputElement>(null);
-  const addNode = useStore(s => s.addNode);
+  const addUploadedFile = useStore(s => s.addUploadedFile);
 
   function onDrop(e: React.DragEvent<HTMLDivElement>) {
     e.preventDefault();
@@ -21,8 +20,8 @@ export default function UploadDropzone() {
   function handleFile(file: File) {
     window.__fileMap ||= new Map<string, File>();
     window.__fileMap.set(file.name, file);
-    const node = createReadCsvNode(file.name);
-    addNode(node);
+    addUploadedFile(file.name);
+    // No automatic node creation - user must select file and load it
   }
 
   return (

@@ -2,71 +2,44 @@
 
 import React from 'react';
 import UploadDropzone from '@/components/UploadDropzone';
-import Inspector from '@/components/Inspector';
-import TablePreview from '@/components/TablePreview';
-import CodeBlock from '@/components/CodeBlock';
+import UploadedFilesList from '@/components/UploadedFilesList';
+import FileInspector from '@/components/FileInspector';
 import { useStore } from '@/core/state';
 
 export default function LoadCsvPage() {
-  const node = useStore(s => s.workflow.nodes[0]);
-  const artifacts = useStore(s => s.artifacts);
-  
-  // Get CSV data for Python execution
-  const getCsvData = async (): Promise<string | undefined> => {
-    if (!node) return undefined;
-    const filenameParam = node.params.find(p => p.key === 'filename');
-    if (!filenameParam) return undefined;
-    const file = window.__fileMap?.get(filenameParam.value as string);
-    if (!file) return undefined;
-    return await file.text();
-  };
+  const uploadedFiles = useStore(s => s.uploadedFiles);
+  const [selectedFile, setSelectedFile] = React.useState<string | null>(null);
 
-  const [csvData, setCsvData] = React.useState<string | undefined>(undefined);
-
+  // Auto-select first file when files are uploaded
   React.useEffect(() => {
-    if (node) {
-      getCsvData().then(setCsvData);
+    if (uploadedFiles.length > 0 && !selectedFile) {
+      setSelectedFile(uploadedFiles[0]);
     }
-  }, [node]);
+  }, [uploadedFiles, selectedFile]);
 
   return (
     <div className="space-y-6">
       <section className="rounded-2xl border bg-white p-4">
-        <h2 className="text-base font-semibold mb-2">1) Upload a CSV</h2>
+        <h2 className="text-base font-semibold mb-2">1) Upload CSV Files</h2>
         <UploadDropzone />
-        <p className="text-xs text-gray-500 mt-2">MVP: client-only parsing using PapaParse; shows preview + code.</p>
+        <p className="text-xs text-gray-500 mt-2">
+          Upload CSV files, then select one below to configure and load.
+        </p>
       </section>
 
-      {node && (
-        <section className="grid md:grid-cols-2 gap-6">
-          <div className="rounded-2xl border bg-white p-4">
-            <h3 className="font-semibold mb-3">Inspector</h3>
-            <Inspector nodeId={node.id} />
-          </div>
-          <div className="rounded-2xl border bg-white p-4 space-y-4">
-            <div>
-              <h3 className="font-semibold mb-2">Generated Code (Python)</h3>
-              <CodeBlock 
-                code={node.code.text} 
-                editable={true}
-                csvData={csvData}
-                filename={node.params.find(p => p.key === 'filename')?.value as string}
-              />
-            </div>
-            <div>
-              <h3 className="font-semibold mb-2">Preview (JavaScript)</h3>
-              {node.outputs.map(id => (
-                <div key={id} className="mb-4">
-                  <TablePreview artifactId={id} />
-                </div>
-              ))}
-            </div>
-          </div>
-        </section>
+      {uploadedFiles.length > 0 && (
+        <UploadedFilesList 
+          selectedFile={selectedFile}
+          onSelectFile={setSelectedFile}
+        />
       )}
 
-      {!node && (
-        <p className="text-sm text-gray-600">No nodes yet. Upload a CSV to create a <em>Read CSV</em> node.</p>
+      {selectedFile && (
+        <FileInspector filename={selectedFile} />
+      )}
+
+      {!uploadedFiles.length && (
+        <p className="text-sm text-gray-600">No files uploaded. Upload a CSV to get started.</p>
       )}
     </div>
   );

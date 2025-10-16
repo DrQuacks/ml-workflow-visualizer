@@ -23,6 +23,11 @@ export default function PythonExecutor({ initialCode, csvData, filename }: Pytho
     setIsMounted(true);
   }, []);
 
+  // Update code when initialCode prop changes
+  useEffect(() => {
+    setCode(initialCode);
+  }, [initialCode]);
+
   if (!isMounted) {
     return <div className="p-4 border rounded-lg bg-gray-50">Loading editor...</div>;
   }
@@ -67,7 +72,13 @@ export default function PythonExecutor({ initialCode, csvData, filename }: Pytho
               : 'Run Python (First run loads Python runtime ~10MB)'}
           </button>
         </div>
-        <PythonCodeEditor code={code} onChange={setCode} />
+        {code ? (
+          <PythonCodeEditor code={code} onChange={setCode} />
+        ) : (
+          <div className="p-4 bg-gray-800 text-gray-400 text-sm">
+            No code to display. Check if code is being generated properly.
+          </div>
+        )}
       </div>
 
       {/* Execution Time */}
