@@ -72,9 +72,6 @@ export default function SplitPage() {
       {selectedDataframeName && splitCode && (
         <section className="rounded-2xl border bg-white p-4">
           <h3 className="font-semibold mb-2">Python Code</h3>
-          <p className="text-xs text-gray-500 mb-3">
-            Configure split above, then click "Run Python" to execute the split.
-          </p>
           <CodeBlock 
             code={splitCode}
             editable={true}
