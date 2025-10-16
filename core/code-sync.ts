@@ -69,13 +69,73 @@ export function generateReadCsvCode(params: ReadCsvParams): string {
 }
 
 export interface SplitParams {
-  varName?: string; // Optional: for when split creates multiple vars
   sourceVar: string;
   trainPercent: number;
   validationPercent: number;
   testPercent: number;
   includeValidation: boolean;
   splitOrder: string[];
+}
+
+/**
+ * Generate split Python code from parameters
+ */
+export function generateSplitCode(params: SplitParams): string {
+  const { sourceVar, trainPercent, validationPercent, testPercent, includeValidation, splitOrder } = params;
+  
+  const lines = ['import pandas as pd', ''];
+  
+  // Get the total rows
+  lines.push(`# Split ${sourceVar} into train/test sets`);
+  lines.push(`total_rows = len(${sourceVar})`);
+  lines.push('');
+  
+  const splits = includeValidation ? ['train', 'validation', 'test'] : ['train', 'test'];
+  const percents: Record<string, number> = {
+    train: trainPercent,
+    validation: validationPercent,
+    test: testPercent,
+  };
+  
+  const order = splitOrder.filter(s => splits.includes(s));
+  
+  // Generate split sizes
+  lines.push('# Calculate split sizes');
+  order.forEach((splitName, idx) => {
+    if (idx < order.length - 1) {
+      const percent = percents[splitName];
+      lines.push(`${splitName}_size = int(total_rows * ${(percent / 100).toFixed(2)})`);
+    }
+  });
+  lines.push('');
+  
+  // Generate split indices
+  lines.push('# Calculate split indices');
+  order.forEach((splitName, idx) => {
+    if (idx === 0) {
+      lines.push(`${splitName}_end = ${splitName}_size`);
+    } else if (idx < order.length - 1) {
+      const prevSplit = order[idx - 1];
+      lines.push(`${splitName}_end = ${prevSplit}_end + ${splitName}_size`);
+    }
+  });
+  lines.push('');
+  
+  // Generate dataframe splits
+  lines.push('# Create split dataframes');
+  order.forEach((splitName, idx) => {
+    if (idx === 0) {
+      lines.push(`${splitName}_df = ${sourceVar}.iloc[0:${splitName}_end]`);
+    } else if (idx === order.length - 1) {
+      const prevSplit = order[idx - 1];
+      lines.push(`${splitName}_df = ${sourceVar}.iloc[${prevSplit}_end:]`);
+    } else {
+      const prevSplit = order[idx - 1];
+      lines.push(`${splitName}_df = ${sourceVar}.iloc[${prevSplit}_end:${splitName}_end]`);
+    }
+  });
+  
+  return lines.join('\n');
 }
 
 /**
@@ -94,12 +154,12 @@ export function parseSplitCode(code: string): Partial<SplitParams> | null {
     // Extract split percentages from size calculations
     const trainMatch = code.match(/train_size\s*=\s*int\(total_rows\s*\*\s*([\d.]+)\)/);
     if (trainMatch) {
-      params.trainPercent = parseFloat(trainMatch[1]) * 100;
+      params.trainPercent = Math.round(parseFloat(trainMatch[1]) * 100);
     }
 
     const valMatch = code.match(/validation_size\s*=\s*int\(total_rows\s*\*\s*([\d.]+)\)/);
     if (valMatch) {
-      params.validationPercent = parseFloat(valMatch[1]) * 100;
+      params.validationPercent = Math.round(parseFloat(valMatch[1]) * 100);
       params.includeValidation = true;
     } else {
       params.validationPercent = 0;
@@ -108,13 +168,13 @@ export function parseSplitCode(code: string): Partial<SplitParams> | null {
 
     const testMatch = code.match(/test_size\s*=\s*int\(total_rows\s*\*\s*([\d.]+)\)/);
     if (testMatch) {
-      params.testPercent = parseFloat(testMatch[1]) * 100;
+      params.testPercent = Math.round(parseFloat(testMatch[1]) * 100);
     }
 
     // Extract split order from the order of _df assignments
-    const dfAssignments = code.match(/(\w+)_df\s*=/g);
-    if (dfAssignments) {
-      params.splitOrder = dfAssignments.map(m => m.match(/(\w+)_df/)![1]);
+    const dfAssignments = [...code.matchAll(/(\w+)_df\s*=/g)];
+    if (dfAssignments.length > 0) {
+      params.splitOrder = dfAssignments.map(m => m[1]);
     }
 
     return params;
