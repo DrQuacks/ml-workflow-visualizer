@@ -11,9 +11,10 @@ interface CodeBlockProps {
   onExecuteRef?: React.MutableRefObject<(() => void) | null>;
   onExecutingChange?: (isExecuting: boolean) => void;
   onResultsChange?: (results: Record<string, any> | null, error: string | null) => void;
+  onCodeChange?: (code: string) => void;
 }
 
-export default function CodeBlock({ code, editable = false, csvData, filename, onExecuteRef, onExecutingChange, onResultsChange }: CodeBlockProps) {
+export default function CodeBlock({ code, editable = false, csvData, filename, onExecuteRef, onExecutingChange, onResultsChange, onCodeChange }: CodeBlockProps) {
   if (editable) {
     return <PythonExecutor 
       initialCode={code} 
@@ -22,6 +23,7 @@ export default function CodeBlock({ code, editable = false, csvData, filename, o
       onExecuteRef={onExecuteRef}
       onExecutingChange={onExecutingChange}
       onResultsChange={onResultsChange}
+      onCodeChange={onCodeChange}
     />;
   }
 

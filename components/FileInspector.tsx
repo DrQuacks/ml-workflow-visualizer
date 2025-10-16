@@ -4,8 +4,8 @@ import { useState, useEffect, useRef } from 'react';
 import Papa from 'papaparse';
 import CodeBlock from './CodeBlock';
 import TablePreview from './TablePreview';
-import { ReadCSV } from '@/plugins/io.read_csv';
 import { useStore } from '@/core/state';
+import { parseReadCsvCode, generateReadCsvCode, type ReadCsvParams } from '@/core/code-sync';
 
 interface FileInspectorProps {
   filename: string;
@@ -13,17 +13,27 @@ interface FileInspectorProps {
 }
 
 export default function FileInspector({ filename, onPythonRun }: FileInspectorProps) {
-  const [delimiter, setDelimiter] = useState(',');
-  const [header, setHeader] = useState(true);
-  const [encoding, setEncoding] = useState('utf-8');
+  const [params, setParams] = useState<ReadCsvParams>({
+    varName: 'df',
+    filename,
+    delimiter: ',',
+    header: true,
+    encoding: 'utf-8',
+  });
   const [csvData, setCsvData] = useState<string | undefined>(undefined);
   const [code, setCode] = useState('');
   const [previewArtifactId, setPreviewArtifactId] = useState<string | null>(null);
   const [isExecuting, setIsExecuting] = useState(false);
   const [pythonResults, setPythonResults] = useState<Record<string, any> | null>(null);
   const [pythonError, setPythonError] = useState<string | null>(null);
+  const [isCodeManuallyEdited, setIsCodeManuallyEdited] = useState(false);
   const setArtifacts = useStore(s => s.setArtifacts);
   const runPythonRef = useRef<(() => void) | null>(null);
+
+  // Update params.filename when prop changes
+  useEffect(() => {
+    setParams(prev => ({ ...prev, filename }));
+  }, [filename]);
 
   // Load CSV data when filename changes
   useEffect(() => {
@@ -37,16 +47,32 @@ export default function FileInspector({ filename, onPythonRun }: FileInspectorPr
     loadCsvData();
   }, [filename]);
 
-  // Generate Python code based on current params
+  // GUI → Code: Generate code when params change (unless user manually edited)
   useEffect(() => {
-    const generatedCode = ReadCSV.codegen({
-      filename,
-      delimiter,
-      header,
-      encoding,
-    }).text;
-    setCode(generatedCode);
-  }, [filename, delimiter, header, encoding]);
+    if (!isCodeManuallyEdited) {
+      const generatedCode = generateReadCsvCode(params);
+      setCode(generatedCode);
+    }
+  }, [params, isCodeManuallyEdited]);
+
+  // Code → GUI: Parse code when user manually edits it
+  const handleCodeChange = (newCode: string) => {
+    setCode(newCode);
+    setIsCodeManuallyEdited(true);
+    
+    const parsed = parseReadCsvCode(newCode);
+    if (parsed) {
+      setParams(parsed);
+    }
+    
+    // Reset manual edit flag after a delay to allow GUI updates to regenerate code
+    setTimeout(() => setIsCodeManuallyEdited(false), 100);
+  };
+
+  // Update individual param (used by GUI inputs)
+  const updateParam = <K extends keyof ReadCsvParams>(key: K, value: ReadCsvParams[K]) => {
+    setParams(prev => ({ ...prev, [key]: value }));
+  };
 
   // Generate JS preview when file or params change
   useEffect(() => {
@@ -54,7 +80,7 @@ export default function FileInspector({ filename, onPythonRun }: FileInspectorPr
       if (!csvData) return;
 
       const parsed = Papa.parse<string[]>(csvData, {
-        delimiter: delimiter || ',',
+        delimiter: params.delimiter || ',',
         skipEmptyLines: true,
       });
 
@@ -73,7 +99,7 @@ export default function FileInspector({ filename, onPythonRun }: FileInspectorPr
     };
 
     generatePreview();
-  }, [csvData, delimiter, header, filename, setArtifacts]);
+  }, [csvData, params.delimiter, params.header, filename, setArtifacts]);
 
   return (
     <div className="space-y-6">
@@ -98,27 +124,36 @@ export default function FileInspector({ filename, onPythonRun }: FileInspectorPr
             <div className="space-y-2">
               <div className="text-xs uppercase text-gray-500">Parameters</div>
               <div className="flex items-center gap-2">
+                <label className="w-28 text-gray-700">Name</label>
+                <input
+                  className="border rounded px-2 py-1 flex-1"
+                  value={params.varName}
+                  onChange={(e) => updateParam('varName', e.target.value)}
+                  placeholder="df"
+                />
+              </div>
+              <div className="flex items-center gap-2">
                 <label className="w-28 text-gray-700">Delimiter</label>
                 <input
                   className="border rounded px-2 py-1 flex-1"
-                  value={delimiter}
-                  onChange={(e) => setDelimiter(e.target.value)}
+                  value={params.delimiter}
+                  onChange={(e) => updateParam('delimiter', e.target.value)}
                 />
               </div>
               <div className="flex items-center gap-2">
                 <label className="w-28 text-gray-700">Header</label>
                 <input
                   type="checkbox"
-                  checked={header}
-                  onChange={(e) => setHeader(e.target.checked)}
+                  checked={params.header}
+                  onChange={(e) => updateParam('header', e.target.checked)}
                 />
               </div>
               <div className="flex items-center gap-2">
                 <label className="w-28 text-gray-700">Encoding</label>
                 <input
                   className="border rounded px-2 py-1 flex-1"
-                  value={encoding}
-                  onChange={(e) => setEncoding(e.target.value)}
+                  value={params.encoding}
+                  onChange={(e) => updateParam('encoding', e.target.value)}
                 />
               </div>
             </div>
@@ -127,7 +162,16 @@ export default function FileInspector({ filename, onPythonRun }: FileInspectorPr
 
         {/* Python Code Panel */}
         <div className="rounded-2xl border bg-white p-4">
-          <h3 className="font-semibold mb-2">Python Code</h3>
+          <div className="flex items-center justify-between mb-2">
+            <h3 className="font-semibold">Python Code</h3>
+            <button
+              onClick={() => runPythonRef.current?.()}
+              disabled={isExecuting}
+              className="px-3 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 disabled:bg-gray-600 disabled:cursor-not-allowed transition-colors"
+            >
+              {isExecuting ? 'Executing...' : 'Run Python'}
+            </button>
+          </div>
           <CodeBlock 
             code={code}
             editable={true}
@@ -139,6 +183,7 @@ export default function FileInspector({ filename, onPythonRun }: FileInspectorPr
               setPythonResults(results);
               setPythonError(error);
             }}
+            onCodeChange={handleCodeChange}
           />
         </div>
       </section>

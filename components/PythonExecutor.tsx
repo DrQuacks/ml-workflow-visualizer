@@ -12,9 +12,10 @@ interface PythonExecutorProps {
   onExecuteRef?: React.MutableRefObject<(() => void) | null>;
   onExecutingChange?: (isExecuting: boolean) => void;
   onResultsChange?: (results: Record<string, any> | null, error: string | null) => void;
+  onCodeChange?: (code: string) => void;
 }
 
-export default function PythonExecutor({ initialCode, csvData, filename, onExecuteRef, onExecutingChange, onResultsChange }: PythonExecutorProps) {
+export default function PythonExecutor({ initialCode, csvData, filename, onExecuteRef, onExecutingChange, onResultsChange, onCodeChange }: PythonExecutorProps) {
   const [code, setCode] = useState(initialCode);
   const [isExecuting, setIsExecuting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -85,18 +86,14 @@ export default function PythonExecutor({ initialCode, csvData, filename, onExecu
 
   return (
     <div className="border rounded-lg overflow-hidden">
-      <div className="flex items-center justify-between px-4 py-2 bg-gray-800 text-white text-sm">
-        <span>Python Code (Editable)</span>
-        <button
-          onClick={handleExecute}
-          disabled={isExecuting}
-          className="px-3 py-1 bg-blue-600 rounded hover:bg-blue-700 disabled:bg-gray-600 disabled:cursor-not-allowed transition-colors"
-        >
-          {isExecuting ? 'Executing...' : 'Run Python'}
-        </button>
-      </div>
       {code ? (
-        <PythonCodeEditor code={code} onChange={setCode} />
+        <PythonCodeEditor 
+          code={code} 
+          onChange={(newCode) => {
+            setCode(newCode);
+            onCodeChange?.(newCode);
+          }} 
+        />
       ) : (
         <div className="p-4 bg-gray-800 text-gray-400 text-sm">
           No code to display. Check if code is being generated properly.
