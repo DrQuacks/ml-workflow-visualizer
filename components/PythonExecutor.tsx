@@ -5,6 +5,11 @@ import PythonCodeEditor from './PythonCodeEditor';
 import { executeCode, isPyodideReady } from '@/core/python-runtime';
 import { useStore } from '@/core/state';
 
+interface DataframeContext {
+  type: 'source' | 'derived';
+  parentDataframe?: string;
+}
+
 interface PythonExecutorProps {
   initialCode: string;
   csvData?: string;
@@ -13,9 +18,10 @@ interface PythonExecutorProps {
   onExecutingChange?: (isExecuting: boolean) => void;
   onResultsChange?: (results: Record<string, any> | null, error: string | null) => void;
   onCodeChange?: (code: string) => void;
+  dataframeContext: DataframeContext;
 }
 
-export default function PythonExecutor({ initialCode, csvData, filename, onExecuteRef, onExecutingChange, onResultsChange, onCodeChange }: PythonExecutorProps) {
+export default function PythonExecutor({ initialCode, csvData, filename, onExecuteRef, onExecutingChange, onResultsChange, onCodeChange, dataframeContext }: PythonExecutorProps) {
   const [code, setCode] = useState(initialCode);
   const [isExecuting, setIsExecuting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -50,13 +56,15 @@ export default function PythonExecutor({ initialCode, csvData, filename, onExecu
       setResults(output);
       onResultsChange?.(output, null);
       
-      // Save DataFrame metadata to state
+      // Save DataFrame metadata to state with context
       Object.entries(output).forEach(([name, value]: [string, any]) => {
         if (value && value.type === 'dataframe') {
           addCreatedDataframe({
             name,
             sourceFile: filename || 'unknown',
             rowCount: value.shape[0],
+            type: dataframeContext.type,
+            parentDataframe: dataframeContext.parentDataframe,
           });
         }
       });

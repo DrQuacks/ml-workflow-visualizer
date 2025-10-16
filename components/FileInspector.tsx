@@ -184,6 +184,7 @@ export default function FileInspector({ filename, onPythonRun }: FileInspectorPr
               setPythonError(error);
             }}
             onCodeChange={handleCodeChange}
+            dataframeContext={{ type: 'source' }}
           />
         </div>
       </section>

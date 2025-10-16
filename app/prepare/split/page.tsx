@@ -29,10 +29,11 @@ export default function SplitPage() {
   const [isCodeManuallyEdited, setIsCodeManuallyEdited] = useState(false);
   const runPythonRef = useRef<(() => void) | null>(null);
 
-  // Auto-select first dataframe
+  // Auto-select first source dataframe
   useEffect(() => {
-    if (createdDataframes.length > 0 && !selectedDataframeName) {
-      setSelectedDataframeName(createdDataframes[0].name);
+    const sourceDataframes = createdDataframes.filter(df => df.type === 'source');
+    if (sourceDataframes.length > 0 && !selectedDataframeName) {
+      setSelectedDataframeName(sourceDataframes[0].name);
     }
   }, [createdDataframes, selectedDataframeName]);
 
@@ -86,7 +87,7 @@ export default function SplitPage() {
         {/* Dataframe Selector */}
         <section className="rounded-2xl border bg-white p-4">
           <h3 className="text-sm font-semibold mb-2">Select Source Dataframe</h3>
-          {createdDataframes.length === 0 ? (
+          {createdDataframes.filter(df => df.type === 'source').length === 0 ? (
             <p className="text-sm text-gray-600">No dataframes available. Please load a CSV first using Run Python.</p>
           ) : (
             <select
@@ -95,7 +96,7 @@ export default function SplitPage() {
               className="w-full border rounded px-3 py-2 text-sm"
             >
               <option value="">Select a dataframe...</option>
-              {createdDataframes.map((df) => (
+              {createdDataframes.filter(df => df.type === 'source').map((df) => (
                 <option key={df.name} value={df.name}>
                   {df.name} ({df.sourceFile}, {df.rowCount} rows)
                 </option>
@@ -137,6 +138,10 @@ export default function SplitPage() {
                   setPythonError(error);
                 }}
                 onCodeChange={handleCodeChange}
+                dataframeContext={{ 
+                  type: 'derived', 
+                  parentDataframe: params.sourceVar 
+                }}
               />
             </div>
           </section>

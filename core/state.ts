@@ -8,6 +8,8 @@ export interface CreatedDataframe {
   name: string;
   sourceFile: string;
   rowCount: number;
+  type: 'source' | 'derived';
+  parentDataframe?: string; // For derived DataFrames, tracks the parent
 }
 
 interface Store {

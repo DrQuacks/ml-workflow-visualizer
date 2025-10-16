@@ -3,6 +3,11 @@
 import React from 'react';
 import PythonExecutor from './PythonExecutor';
 
+interface DataframeContext {
+  type: 'source' | 'derived';
+  parentDataframe?: string;
+}
+
 interface CodeBlockProps {
   code: string;
   editable?: boolean;
@@ -12,9 +17,10 @@ interface CodeBlockProps {
   onExecutingChange?: (isExecuting: boolean) => void;
   onResultsChange?: (results: Record<string, any> | null, error: string | null) => void;
   onCodeChange?: (code: string) => void;
+  dataframeContext?: DataframeContext;
 }
 
-export default function CodeBlock({ code, editable = false, csvData, filename, onExecuteRef, onExecutingChange, onResultsChange, onCodeChange }: CodeBlockProps) {
+export default function CodeBlock({ code, editable = false, csvData, filename, onExecuteRef, onExecutingChange, onResultsChange, onCodeChange, dataframeContext }: CodeBlockProps) {
   if (editable) {
     return <PythonExecutor 
       initialCode={code} 
@@ -24,6 +30,7 @@ export default function CodeBlock({ code, editable = false, csvData, filename, o
       onExecutingChange={onExecutingChange}
       onResultsChange={onResultsChange}
       onCodeChange={onCodeChange}
+      dataframeContext={dataframeContext || { type: 'source' }}
     />;
   }
 

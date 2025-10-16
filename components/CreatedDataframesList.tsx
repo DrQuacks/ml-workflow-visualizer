@@ -7,12 +7,26 @@ export default function CreatedDataframesList() {
   const createdDataframes = useStore(s => s.createdDataframes);
   const removeCreatedDataframe = useStore(s => s.removeCreatedDataframe);
 
+  // Filter to show only source DataFrames
+  const sourceDataframes = createdDataframes.filter(df => df.type === 'source');
+
   const handleDelete = async (name: string) => {
+    // Delete the dataframe
     await deleteVariable(name);
     removeCreatedDataframe(name);
+    
+    // Find and delete all derived dataframes (cascade)
+    const derived = createdDataframes.filter(df => 
+      df.type === 'derived' && df.parentDataframe === name
+    );
+    
+    for (const df of derived) {
+      await deleteVariable(df.name);
+      removeCreatedDataframe(df.name);
+    }
   };
 
-  if (createdDataframes.length === 0) {
+  if (sourceDataframes.length === 0) {
     return (
       <div className="rounded-2xl border bg-white p-4">
         <h3 className="text-sm font-semibold mb-3">
@@ -28,10 +42,10 @@ export default function CreatedDataframesList() {
   return (
     <div className="rounded-2xl border bg-white p-4">
       <h3 className="text-sm font-semibold mb-3">
-        Created Dataframes ({createdDataframes.length})
+        Created Dataframes ({sourceDataframes.length})
       </h3>
       <div className="space-y-2">
-        {createdDataframes.map((df) => (
+        {sourceDataframes.map((df) => (
           <div
             key={df.name}
             className="flex items-center justify-between p-2 rounded border bg-gray-50"
