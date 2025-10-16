@@ -97,41 +97,56 @@ export async function executeCode(options: ExecuteCodeOptions): Promise<any> {
       console.log(`[Pyodide] Wrote ${csvData.length} bytes to ${filename}`);
     }
 
+    // Parse code to find variable assignments before execution
+    // This allows us to only show variables that were assigned in this code
+    const parseAssignments = (code: string): string[] => {
+      // Regex to match variable assignments: "variable_name = ..."
+      // Matches start of line (with optional whitespace), valid Python identifier, then =
+      const assignmentRegex = /^\s*([a-zA-Z_][a-zA-Z0-9_]*)\s*=/gm;
+      const assignments = new Set<string>();
+      let match;
+      
+      while ((match = assignmentRegex.exec(code)) !== null) {
+        assignments.add(match[1]);
+      }
+      
+      return Array.from(assignments);
+    };
+
+    const assignedVars = parseAssignments(code);
+    console.log('[Pyodide] Variables assigned in code:', assignedVars);
+
     // Execute the user's code - pd.read_csv() will now work!
     await pyodide.runPythonAsync(code);
 
-    // Extract dataframes from Python namespace
+    // Extract dataframes from Python namespace, filtered by assignments
     const extractionCode = `
 import json
 import pandas as pd
 import numpy as np
 
+# Variables that were assigned in the user's code
+_assigned_vars = ${JSON.stringify(assignedVars)}
+
 _results = {}
 _namespace = globals().copy()
 
-# Check if this is a split operation (has train_df, test_df, etc.)
-_is_split = any(k.endswith('_df') and k != 'df' for k in _namespace.keys())
-
-for _key, _value in _namespace.items():
-    # Skip private variables (starting with _)
-    if _key.startswith('_'):
-        continue
-    
-    if isinstance(_value, pd.DataFrame):
-        # If this is a split operation, only show split results (not the source df)
-        if _is_split and _key == 'df':
-            continue
-            
-        # Convert DataFrame to dict with 'split' orientation for easier JS consumption
-        # Replace NaN with None (converts to null in JSON)
-        _df_clean = _value.head(100).replace({np.nan: None})
-        _df_dict = _df_clean.to_dict('split')
-        _results[_key] = {
-            'type': 'dataframe',
-            'columns': _df_dict['columns'],
-            'data': _df_dict['data'],
-            'shape': list(_value.shape)
-        }
+for _key in _assigned_vars:
+    if _key in _namespace:
+        _value = _namespace[_key]
+        
+        # Only process DataFrames
+        if isinstance(_value, pd.DataFrame):
+            # Convert DataFrame to dict with 'split' orientation for easier JS consumption
+            # Replace NaN with None (converts to null in JSON)
+            _df_clean = _value.head(100).replace({np.nan: None})
+            _df_dict = _df_clean.to_dict('split')
+            _results[_key] = {
+                'type': 'dataframe',
+                'columns': _df_dict['columns'],
+                'data': _df_dict['data'],
+                'shape': list(_value.shape)
+            }
 
 json.dumps(_results)
 `;
