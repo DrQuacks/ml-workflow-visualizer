@@ -109,8 +109,19 @@ import numpy as np
 _results = {}
 _namespace = globals().copy()
 
+# Check if this is a split operation (has train_df, test_df, etc.)
+_is_split = any(k.endswith('_df') and k != 'df' for k in _namespace.keys())
+
 for _key, _value in _namespace.items():
+    # Skip private variables (starting with _)
+    if _key.startswith('_'):
+        continue
+    
     if isinstance(_value, pd.DataFrame):
+        # If this is a split operation, only show split results (not the source df)
+        if _is_split and _key == 'df':
+            continue
+            
         # Convert DataFrame to dict with 'split' orientation for easier JS consumption
         # Replace NaN with None (converts to null in JSON)
         _df_clean = _value.head(100).replace({np.nan: None})
