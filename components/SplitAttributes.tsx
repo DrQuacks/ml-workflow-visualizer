@@ -24,6 +24,7 @@ const DRAG_TYPE = 'SPLIT_ROW';
 
 function DraggableRow({ index, splitName, percent, moveRow, onPercentChange }: DraggableRowProps) {
   const ref = useRef<HTMLDivElement>(null);
+  const dragRef = useRef<HTMLDivElement>(null);
 
   const [{ handlerId }, drop] = useDrop<
     { index: number },
@@ -57,7 +58,7 @@ function DraggableRow({ index, splitName, percent, moveRow, onPercentChange }: D
     },
   });
 
-  const [{ isDragging }, drag, preview] = useDrag({
+  const [{ isDragging }, drag] = useDrag({
     type: DRAG_TYPE,
     item: () => ({ index }),
     collect: (monitor) => ({
@@ -65,7 +66,8 @@ function DraggableRow({ index, splitName, percent, moveRow, onPercentChange }: D
     }),
   });
 
-  preview(drop(ref));
+  drop(ref);
+  drag(dragRef);
 
   return (
     <div
@@ -75,7 +77,7 @@ function DraggableRow({ index, splitName, percent, moveRow, onPercentChange }: D
         isDragging ? 'opacity-40' : ''
       }`}
     >
-      <div ref={drag} className="cursor-ns-resize flex-shrink-0 p-1">
+      <div ref={dragRef} className="cursor-ns-resize flex-shrink-0 p-1">
         <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8h16M4 16h16" />
         </svg>
