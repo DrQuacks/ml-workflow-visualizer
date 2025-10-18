@@ -184,6 +184,80 @@ export function parseSplitCode(code: string): Partial<SplitParams> | null {
   }
 }
 
+export interface FeaturesTargetParams {
+  sourceVar: string;
+  targetColumn: string;
+  featureColumns: string[];
+  featuresVarName: string;
+  targetVarName: string;
+}
+
+/**
+ * Generate features/target split Python code from parameters
+ */
+export function generateFeaturesTargetCode(params: FeaturesTargetParams): string {
+  const { sourceVar, targetColumn, featureColumns, featuresVarName, targetVarName } = params;
+  
+  const lines = ['import pandas as pd', ''];
+  
+  lines.push(`# Split ${sourceVar} into features and target`);
+  
+  if (featureColumns.length > 0) {
+    const featureList = featureColumns.map(c => `'${c}'`).join(', ');
+    lines.push(`feature_cols = [${featureList}]`);
+    lines.push(`${featuresVarName} = ${sourceVar}[feature_cols]`);
+  } else {
+    lines.push(`${featuresVarName} = ${sourceVar}[[]]  # No features selected`);
+  }
+  
+  if (targetColumn) {
+    lines.push(`${targetVarName} = ${sourceVar}['${targetColumn}']`);
+  }
+  
+  return lines.join('\n');
+}
+
+/**
+ * Parse features/target code to extract parameters
+ */
+export function parseFeaturesTargetCode(code: string): Partial<FeaturesTargetParams> | null {
+  try {
+    const params: Partial<FeaturesTargetParams> = {};
+
+    // Extract source variable from feature assignment
+    const sourceMatch = code.match(/=\s*(\w+)\[/);
+    if (sourceMatch) {
+      params.sourceVar = sourceMatch[1];
+    }
+
+    // Extract feature columns from list
+    const featureMatch = code.match(/feature_cols\s*=\s*\[(.*?)\]/s);
+    if (featureMatch) {
+      const colsStr = featureMatch[1];
+      const cols = [...colsStr.matchAll(/['"]([^'"]+)['"]/g)].map(m => m[1]);
+      params.featureColumns = cols;
+    }
+
+    // Extract features variable name
+    const featuresVarMatch = code.match(/^(\w+)\s*=\s*\w+\[feature_cols\]/m);
+    if (featuresVarMatch) {
+      params.featuresVarName = featuresVarMatch[1];
+    }
+
+    // Extract target column and variable name
+    const targetMatch = code.match(/^(\w+)\s*=\s*\w+\[['"]([^'"]+)['"]\]/m);
+    if (targetMatch) {
+      params.targetVarName = targetMatch[1];
+      params.targetColumn = targetMatch[2];
+    }
+
+    return params;
+  } catch (error) {
+    console.error('Failed to parse features/target code:', error);
+    return null;
+  }
+}
+
 /**
  * Helper: Format Python boolean value
  */
