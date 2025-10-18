@@ -8,6 +8,8 @@ import { useStore } from '@/core/state';
 interface DataframeContext {
   type: 'source' | 'derived';
   parentDataframe?: string;
+  colType?: 'full' | 'features' | 'target';
+  colTypeMap?: Record<string, 'full' | 'features' | 'target'>;
 }
 
 interface PythonExecutorProps {
@@ -59,12 +61,21 @@ export default function PythonExecutor({ initialCode, csvData, filename, onExecu
       // Save DataFrame metadata to state with context
       Object.entries(output).forEach(([name, value]: [string, any]) => {
         if (value && value.type === 'dataframe') {
+          // Determine colType from map or default
+          let colType: 'full' | 'features' | 'target' = 'full';
+          if (dataframeContext.colTypeMap && dataframeContext.colTypeMap[name]) {
+            colType = dataframeContext.colTypeMap[name];
+          } else if (dataframeContext.colType) {
+            colType = dataframeContext.colType;
+          }
+          
           addCreatedDataframe({
             name,
             sourceFile: filename || 'unknown',
             rowCount: value.shape[0],
             type: dataframeContext.type,
             parentDataframe: dataframeContext.parentDataframe,
+            colType,
           });
         }
       });

@@ -10,6 +10,7 @@ export interface CreatedDataframe {
   rowCount: number;
   type: 'source' | 'derived';
   parentDataframe?: string; // For derived DataFrames, tracks the parent
+  colType: 'full' | 'features' | 'target'; // Column type: full (all cols), features (X), or target (y)
 }
 
 interface Store {

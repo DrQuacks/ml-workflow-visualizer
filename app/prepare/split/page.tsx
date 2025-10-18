@@ -7,11 +7,13 @@ import { useStore } from '@/core/state';
 import SplitAttributes from '@/components/SplitAttributes';
 import CodeBlock from '@/components/CodeBlock';
 import { parseSplitCode, generateSplitCode, type SplitParams } from '@/core/code-sync';
+import { isPyodideReady, verifyDataframesExist } from '@/core/python-runtime';
 // Import to register the plugin
 import '@/plugins/prep.train_test_split';
 
 export default function SplitPage() {
   const createdDataframes = useStore(s => s.createdDataframes);
+  const removeCreatedDataframe = useStore(s => s.removeCreatedDataframe);
   const [selectedDataframeName, setSelectedDataframeName] = useState<string>('');
   const [params, setParams] = useState<SplitParams>({
     sourceVar: 'df',
@@ -29,9 +31,27 @@ export default function SplitPage() {
   const [isCodeManuallyEdited, setIsCodeManuallyEdited] = useState(false);
   const runPythonRef = useRef<(() => void) | null>(null);
 
-  // Auto-select first source dataframe
+  // Verify and clean up stale DataFrames on mount
   useEffect(() => {
-    const sourceDataframes = createdDataframes.filter(df => df.type === 'source');
+    const syncState = async () => {
+      if (!isPyodideReady() || createdDataframes.length === 0) return;
+      
+      const names = createdDataframes.map(df => df.name);
+      const existing = await verifyDataframesExist(names);
+      const stale = names.filter(n => !existing.includes(n));
+      
+      if (stale.length > 0) {
+        console.log('[State Sync] Removing stale DataFrames:', stale);
+        stale.forEach(name => removeCreatedDataframe(name));
+      }
+    };
+    
+    syncState();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Auto-select first source dataframe with colType 'full'
+  useEffect(() => {
+    const sourceDataframes = createdDataframes.filter(df => df.type === 'source' && df.colType === 'full');
     if (sourceDataframes.length > 0 && !selectedDataframeName) {
       setSelectedDataframeName(sourceDataframes[0].name);
     }
@@ -87,7 +107,7 @@ export default function SplitPage() {
         {/* Dataframe Selector */}
         <section className="rounded-2xl border bg-white p-4">
           <h3 className="text-sm font-semibold mb-2">Select Source Dataframe</h3>
-          {createdDataframes.filter(df => df.type === 'source').length === 0 ? (
+          {createdDataframes.filter(df => df.type === 'source' && df.colType === 'full').length === 0 ? (
             <p className="text-sm text-gray-600">No dataframes available. Please load a CSV first using Run Python.</p>
           ) : (
             <select
@@ -96,7 +116,7 @@ export default function SplitPage() {
               className="w-full border rounded px-3 py-2 text-sm"
             >
               <option value="">Select a dataframe...</option>
-              {createdDataframes.filter(df => df.type === 'source').map((df) => (
+              {createdDataframes.filter(df => df.type === 'source' && df.colType === 'full').map((df) => (
                 <option key={df.name} value={df.name}>
                   {df.name} ({df.sourceFile}, {df.rowCount} rows)
                 </option>
@@ -140,7 +160,8 @@ export default function SplitPage() {
                 onCodeChange={handleCodeChange}
                 dataframeContext={{ 
                   type: 'derived', 
-                  parentDataframe: params.sourceVar 
+                  parentDataframe: params.sourceVar,
+                  colType: 'full'
                 }}
               />
             </div>

@@ -211,6 +211,7 @@ export function generateFeaturesTargetCode(params: FeaturesTargetParams): string
   }
   
   if (targetColumn) {
+    // Single brackets to return Series (standard for target variable)
     lines.push(`${targetVarName} = ${sourceVar}['${targetColumn}']`);
   }
   
@@ -244,7 +245,7 @@ export function parseFeaturesTargetCode(code: string): Partial<FeaturesTargetPar
       params.featuresVarName = featuresVarMatch[1];
     }
 
-    // Extract target column and variable name
+    // Extract target column and variable name (single brackets for Series)
     const targetMatch = code.match(/^(\w+)\s*=\s*\w+\[['"]([^'"]+)['"]\]/m);
     if (targetMatch) {
       params.targetVarName = targetMatch[1];

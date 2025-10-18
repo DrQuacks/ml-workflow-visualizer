@@ -173,6 +173,52 @@ json.dumps(_results)
   }
 }
 
+export async function verifyDataframesExist(names: string[]): Promise<string[]> {
+  if (!pyodideInstance || names.length === 0) {
+    return [];
+  }
+  
+  try {
+    const result = await pyodideInstance.runPythonAsync(`
+import json
+existing = []
+for name in ${JSON.stringify(names)}:
+    if name in globals() and hasattr(globals()[name], 'columns'):
+        existing.append(name)
+json.dumps(existing)
+`);
+    return JSON.parse(result || '[]');
+  } catch (error) {
+    console.error('Failed to verify DataFrames:', error);
+    return [];
+  }
+}
+
+export async function getDataframeColumns(varName: string): Promise<string[]> {
+  if (!pyodideInstance) {
+    return [];
+  }
+  
+  try {
+    const checkExists = await pyodideInstance.runPythonAsync(`
+'${varName}' in globals() and hasattr(globals()['${varName}'], 'columns')
+`);
+    
+    if (!checkExists) {
+      return [];
+    }
+    
+    const result = await pyodideInstance.runPythonAsync(`
+import json
+json.dumps(list(globals()['${varName}'].columns))
+`);
+    return JSON.parse(result || '[]');
+  } catch (error) {
+    console.error(`Failed to get columns for ${varName}:`, error);
+    return [];
+  }
+}
+
 export async function deleteVariable(varName: string): Promise<void> {
   if (!pyodideInstance) return;
   
