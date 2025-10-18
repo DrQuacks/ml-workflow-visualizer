@@ -1,8 +1,9 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import Papa from 'papaparse';
-import CodeBlock from './CodeBlock';
+import PythonWorkspace from './PythonWorkspace';
+import ReadCsvAttributes from './ReadCsvAttributes';
 import TablePreview from './TablePreview';
 import { useStore } from '@/core/state';
 import { parseReadCsvCode, generateReadCsvCode, type ReadCsvParams } from '@/core/code-sync';
@@ -13,6 +14,8 @@ interface FileInspectorProps {
 }
 
 export default function FileInspector({ filename, onPythonRun }: FileInspectorProps) {
+  const setArtifacts = useStore(s => s.setArtifacts);
+  
   const [params, setParams] = useState<ReadCsvParams>({
     varName: 'df',
     filename,
@@ -21,14 +24,9 @@ export default function FileInspector({ filename, onPythonRun }: FileInspectorPr
     encoding: 'utf-8',
   });
   const [csvData, setCsvData] = useState<string | undefined>(undefined);
-  const [code, setCode] = useState('');
   const [previewArtifactId, setPreviewArtifactId] = useState<string | null>(null);
-  const [isExecuting, setIsExecuting] = useState(false);
   const [pythonResults, setPythonResults] = useState<Record<string, any> | null>(null);
   const [pythonError, setPythonError] = useState<string | null>(null);
-  const [isCodeManuallyEdited, setIsCodeManuallyEdited] = useState(false);
-  const setArtifacts = useStore(s => s.setArtifacts);
-  const runPythonRef = useRef<(() => void) | null>(null);
 
   // Update params.filename when prop changes
   useEffect(() => {
@@ -47,33 +45,6 @@ export default function FileInspector({ filename, onPythonRun }: FileInspectorPr
     loadCsvData();
   }, [filename]);
 
-  // GUI → Code: Generate code when params change (unless user manually edited)
-  useEffect(() => {
-    if (!isCodeManuallyEdited) {
-      const generatedCode = generateReadCsvCode(params);
-      setCode(generatedCode);
-    }
-  }, [params, isCodeManuallyEdited]);
-
-  // Code → GUI: Parse code when user manually edits it
-  const handleCodeChange = (newCode: string) => {
-    setCode(newCode);
-    setIsCodeManuallyEdited(true);
-    
-    const parsed = parseReadCsvCode(newCode);
-    if (parsed) {
-      setParams(parsed);
-    }
-    
-    // Reset manual edit flag after a delay to allow GUI updates to regenerate code
-    setTimeout(() => setIsCodeManuallyEdited(false), 100);
-  };
-
-  // Update individual param (used by GUI inputs)
-  const updateParam = <K extends keyof ReadCsvParams>(key: K, value: ReadCsvParams[K]) => {
-    setParams(prev => ({ ...prev, [key]: value }));
-  };
-
   // Generate JS preview when file or params change
   useEffect(() => {
     const generatePreview = async () => {
@@ -84,7 +55,9 @@ export default function FileInspector({ filename, onPythonRun }: FileInspectorPr
         skipEmptyLines: true,
       });
 
-      const rows: string[][] = Array.isArray(parsed.data) ? parsed.data.slice(0, 101) as any : [];
+      const rows: string[][] = Array.isArray(parsed.data) 
+        ? parsed.data.slice(0, 101) as any 
+        : [];
       const artifactId = `preview_${filename}`;
       
       setArtifacts({
@@ -103,93 +76,25 @@ export default function FileInspector({ filename, onPythonRun }: FileInspectorPr
 
   return (
     <div className="space-y-6">
-      <section className="grid md:grid-cols-2 gap-6">
-        {/* Python Attributes Panel */}
-        <div className="rounded-2xl border bg-white p-4">
-          <div className="flex items-center justify-between mb-3">
-            <h3 className="font-semibold">Python Attributes</h3>
-            <button
-              onClick={() => runPythonRef.current?.()}
-              disabled={isExecuting}
-              className="px-3 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 disabled:bg-gray-600 disabled:cursor-not-allowed transition-colors"
-            >
-              {isExecuting ? 'Executing...' : 'Run Python'}
-            </button>
-          </div>
-          <div className="space-y-4 text-sm">
-            <div>
-              <div className="text-xs uppercase text-gray-500">File</div>
-              <div className="font-medium">{filename}</div>
-            </div>
-            <div className="space-y-2">
-              <div className="text-xs uppercase text-gray-500">Parameters</div>
-              <div className="flex items-center gap-2">
-                <label className="w-28 text-gray-700">Name</label>
-                <input
-                  className="border rounded px-2 py-1 flex-1"
-                  value={params.varName}
-                  onChange={(e) => updateParam('varName', e.target.value)}
-                  placeholder="df"
-                />
-              </div>
-              <div className="flex items-center gap-2">
-                <label className="w-28 text-gray-700">Delimiter</label>
-                <input
-                  className="border rounded px-2 py-1 flex-1"
-                  value={params.delimiter}
-                  onChange={(e) => updateParam('delimiter', e.target.value)}
-                />
-              </div>
-              <div className="flex items-center gap-2">
-                <label className="w-28 text-gray-700">Header</label>
-                <input
-                  type="checkbox"
-                  checked={params.header}
-                  onChange={(e) => updateParam('header', e.target.checked)}
-                />
-              </div>
-              <div className="flex items-center gap-2">
-                <label className="w-28 text-gray-700">Encoding</label>
-                <input
-                  className="border rounded px-2 py-1 flex-1"
-                  value={params.encoding}
-                  onChange={(e) => updateParam('encoding', e.target.value)}
-                />
-              </div>
-            </div>
-          </div>
-        </div>
+      {/* Python Workspace */}
+      <PythonWorkspace
+        initialParams={params}
+        generateCode={generateReadCsvCode}
+        parseCode={parseReadCsvCode}
+        AttributesComponent={ReadCsvAttributes}
+        dataframeContext={{ type: 'source', colType: 'full' }}
+        csvData={csvData}
+        filename={filename}
+        onParamsChange={setParams}
+        onResultsChange={(results, error) => {
+          setPythonResults(results);
+          setPythonError(error);
+          onPythonRun?.();
+        }}
+        shouldGenerateCode={true}
+      />
 
-        {/* Python Code Panel */}
-        <div className="rounded-2xl border bg-white p-4">
-          <div className="flex items-center justify-between mb-2">
-            <h3 className="font-semibold">Python Code</h3>
-            <button
-              onClick={() => runPythonRef.current?.()}
-              disabled={isExecuting}
-              className="px-3 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 disabled:bg-gray-600 disabled:cursor-not-allowed transition-colors"
-            >
-              {isExecuting ? 'Executing...' : 'Run Python'}
-            </button>
-          </div>
-          <CodeBlock 
-            code={code}
-            editable={true}
-            csvData={csvData}
-            filename={filename}
-            onExecuteRef={runPythonRef}
-            onExecutingChange={setIsExecuting}
-            onResultsChange={(results, error) => {
-              setPythonResults(results);
-              setPythonError(error);
-            }}
-            onCodeChange={handleCodeChange}
-            dataframeContext={{ type: 'source', colType: 'full' }}
-          />
-        </div>
-      </section>
-
-      {/* Python Results (separate section) */}
+      {/* Python Results */}
       {pythonError && (
         <section className="rounded-2xl border border-red-200 bg-red-50 p-4">
           <h3 className="font-semibold text-red-800 mb-2">Python Error</h3>
@@ -201,9 +106,8 @@ export default function FileInspector({ filename, onPythonRun }: FileInspectorPr
 
       {pythonResults && Object.keys(pythonResults).length > 0 && (
         <section className="rounded-2xl border bg-white p-4 space-y-4">
-          <h3 className="font-semibold text-green-700">✓ Python Results</h3>
+          <h3 className="font-semibold text-green-700">✓ Execution Successful</h3>
           {Object.entries(pythonResults).map(([varName, value]: [string, any]) => {
-            // Check if it's a DataFrame result
             if (value && value.type === 'dataframe') {
               const { columns, data, shape } = value;
               
@@ -259,7 +163,7 @@ export default function FileInspector({ filename, onPythonRun }: FileInspectorPr
         </section>
       )}
 
-      {/* JS Preview (separate section) */}
+      {/* JS Preview */}
       {previewArtifactId && (
         <section className="rounded-2xl border bg-white p-4">
           <h3 className="font-semibold mb-2">Preview (JavaScript)</h3>
@@ -269,4 +173,3 @@ export default function FileInspector({ filename, onPythonRun }: FileInspectorPr
     </div>
   );
 }
-

@@ -1,9 +1,9 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { useStore } from '@/core/state';
+import PythonWorkspace from '@/components/PythonWorkspace';
 import FeaturesTargetAttributes from '@/components/FeaturesTargetAttributes';
-import CodeBlock from '@/components/CodeBlock';
 import TablePreview from '@/components/TablePreview';
 import { parseFeaturesTargetCode, generateFeaturesTargetCode, type FeaturesTargetParams } from '@/core/code-sync';
 import { getDataframeColumns, isPyodideReady, verifyDataframesExist } from '@/core/python-runtime';
@@ -22,15 +22,11 @@ export default function FeaturesTargetPage() {
     featuresVarName: 'X',
     targetVarName: 'y',
   });
-  const [code, setCode] = useState('');
   const [csvData, setCsvData] = useState<string | undefined>(undefined);
-  const [isExecuting, setIsExecuting] = useState(false);
   const [pythonResults, setPythonResults] = useState<Record<string, any> | null>(null);
   const [pythonError, setPythonError] = useState<string | null>(null);
-  const [isCodeManuallyEdited, setIsCodeManuallyEdited] = useState(false);
   const [previewArtifactId, setPreviewArtifactId] = useState<string | null>(null);
   const [availableColumns, setAvailableColumns] = useState<string[]>([]);
-  const runPythonRef = useRef<(() => void) | null>(null);
 
   // Verify and clean up stale DataFrames on mount
   useEffect(() => {
@@ -136,26 +132,6 @@ export default function FeaturesTargetPage() {
     loadCsvData();
   }, [sourceFile]);
 
-  // GUI → Code: Generate when params change
-  useEffect(() => {
-    if (!isCodeManuallyEdited && selectedDataframeName && availableColumns.length > 0) {
-      const generatedCode = generateFeaturesTargetCode(params);
-      setCode(generatedCode);
-    }
-  }, [params, isCodeManuallyEdited, selectedDataframeName, availableColumns]);
-
-  // Code → GUI: Parse when code edited
-  const handleCodeChange = (newCode: string) => {
-    setCode(newCode);
-    setIsCodeManuallyEdited(true);
-    
-    const parsed = parseFeaturesTargetCode(newCode);
-    if (parsed) {
-      setParams(prev => ({ ...prev, ...parsed }));
-    }
-    
-    setTimeout(() => setIsCodeManuallyEdited(false), 100);
-  };
 
   return (
     <div className="space-y-6">
@@ -190,51 +166,31 @@ export default function FeaturesTargetPage() {
         </section>
       )}
 
-      {/* Python Attributes + Python Code */}
-      {selectedDataframeName && (
-        <section className="grid md:grid-cols-2 gap-6">
-          <FeaturesTargetAttributes 
-            params={params}
-            onParamsChange={setParams}
-            isExecuting={isExecuting}
-            onRunPython={() => runPythonRef.current?.()}
-            availableColumns={availableColumns}
-          />
-          
-          <div className="rounded-2xl border bg-white p-4">
-            <div className="flex items-center justify-between mb-2">
-              <h3 className="font-semibold">Python Code</h3>
-              <button
-                onClick={() => runPythonRef.current?.()}
-                disabled={isExecuting}
-                className="px-3 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 disabled:bg-gray-600 disabled:cursor-not-allowed transition-colors"
-              >
-                {isExecuting ? 'Executing...' : 'Run Python'}
-              </button>
-            </div>
-            <CodeBlock 
-              code={code}
-              editable={true}
-              csvData={csvData}
-              filename={sourceFile}
-              onExecuteRef={runPythonRef}
-              onExecutingChange={setIsExecuting}
-              onResultsChange={(results, error) => {
-                setPythonResults(results);
-                setPythonError(error);
-              }}
-              onCodeChange={handleCodeChange}
-              dataframeContext={{ 
-                type: 'derived', 
-                parentDataframe: params.sourceVar,
-                colTypeMap: {
-                  [params.featuresVarName]: 'features',
-                  [params.targetVarName]: 'target'
-                }
-              }}
-            />
-          </div>
-        </section>
+      {/* Python Workspace */}
+      {selectedDataframeName && availableColumns.length > 0 && (
+        <PythonWorkspace
+          initialParams={params}
+          generateCode={generateFeaturesTargetCode}
+          parseCode={parseFeaturesTargetCode}
+          AttributesComponent={FeaturesTargetAttributes}
+          attributesProps={{ availableColumns }}
+          dataframeContext={{ 
+            type: 'derived', 
+            parentDataframe: params.sourceVar,
+            colTypeMap: {
+              [params.featuresVarName]: 'features',
+              [params.targetVarName]: 'target'
+            }
+          }}
+          csvData={csvData}
+          filename={sourceFile}
+          onParamsChange={setParams}
+          onResultsChange={(results, error) => {
+            setPythonResults(results);
+            setPythonError(error);
+          }}
+          shouldGenerateCode={!!selectedDataframeName && availableColumns.length > 0}
+        />
       )}
 
       {/* Python Results */}

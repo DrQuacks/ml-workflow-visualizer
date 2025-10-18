@@ -1,15 +1,62 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { DndProvider } from 'react-dnd';
 import { HTML5Backend } from 'react-dnd-html5-backend';
 import { useStore } from '@/core/state';
+import PythonWorkspace from '@/components/PythonWorkspace';
 import SplitAttributes from '@/components/SplitAttributes';
-import CodeBlock from '@/components/CodeBlock';
 import { parseSplitCode, generateSplitCode, type SplitParams } from '@/core/code-sync';
 import { isPyodideReady, verifyDataframesExist } from '@/core/python-runtime';
 // Import to register the plugin
 import '@/plugins/prep.train_test_split';
+
+// Normalization function to ensure percentages sum to 100%
+// Detects which values changed and adjusts the others
+const normalizeSplitPercentages = (parsed: SplitParams, current: SplitParams): SplitParams => {
+  const { trainPercent, validationPercent, testPercent, splitOrder } = parsed;
+  const total = trainPercent + validationPercent + testPercent;
+  
+  if (total === 100) {
+    return parsed; // Already correct
+  }
+  
+  // Find which value(s) the user changed
+  const trainChanged = trainPercent !== current.trainPercent;
+  const valChanged = validationPercent !== current.validationPercent;
+  const testChanged = testPercent !== current.testPercent;
+  
+  const diff = 100 - total;
+  const newPercentages: Record<string, number> = {
+    train: trainPercent,
+    validation: validationPercent,
+    test: testPercent,
+  };
+  
+  // Find splits in order that were NOT changed
+  const unchangedSplits = splitOrder.filter(s => {
+    if (s === 'train') return !trainChanged;
+    if (s === 'validation') return !valChanged;
+    if (s === 'test') return !testChanged;
+    return false;
+  });
+  
+  if (unchangedSplits.length > 0) {
+    // Distribute diff to first unchanged split
+    const targetSplit = unchangedSplits[0];
+    newPercentages[targetSplit] += diff;
+  } else {
+    // All were changed? Just adjust first one
+    newPercentages[splitOrder[0]] += diff;
+  }
+  
+  return {
+    ...parsed,
+    trainPercent: Math.max(0, Math.min(100, newPercentages.train)),
+    validationPercent: Math.max(0, Math.min(100, newPercentages.validation)),
+    testPercent: Math.max(0, Math.min(100, newPercentages.test)),
+  };
+};
 
 export default function SplitPage() {
   const createdDataframes = useStore(s => s.createdDataframes);
@@ -23,13 +70,9 @@ export default function SplitPage() {
     testPercent: 20,
     splitOrder: ['train', 'test']
   });
-  const [code, setCode] = useState('');
   const [csvData, setCsvData] = useState<string | undefined>(undefined);
-  const [isExecuting, setIsExecuting] = useState(false);
   const [pythonResults, setPythonResults] = useState<Record<string, any> | null>(null);
   const [pythonError, setPythonError] = useState<string | null>(null);
-  const [isCodeManuallyEdited, setIsCodeManuallyEdited] = useState(false);
-  const runPythonRef = useRef<(() => void) | null>(null);
 
   // Verify and clean up stale DataFrames on mount
   useEffect(() => {
@@ -80,26 +123,6 @@ export default function SplitPage() {
     loadCsvData();
   }, [sourceFile]);
 
-  // GUI → Code: Generate when params change
-  useEffect(() => {
-    if (!isCodeManuallyEdited && selectedDataframeName) {
-      const generatedCode = generateSplitCode(params);
-      setCode(generatedCode);
-    }
-  }, [params, isCodeManuallyEdited, selectedDataframeName]);
-
-  // Code → GUI: Parse when code edited
-  const handleCodeChange = (newCode: string) => {
-    setCode(newCode);
-    setIsCodeManuallyEdited(true);
-    
-    const parsed = parseSplitCode(newCode);
-    if (parsed) {
-      setParams(prev => ({ ...prev, ...parsed }));
-    }
-    
-    setTimeout(() => setIsCodeManuallyEdited(false), 100);
-  };
 
   return (
     <DndProvider backend={HTML5Backend}>
@@ -125,47 +148,28 @@ export default function SplitPage() {
           )}
         </section>
 
-        {/* Python Attributes + Python Code */}
+        {/* Python Workspace */}
         {selectedDataframeName && (
-          <section className="grid md:grid-cols-2 gap-6">
-            <SplitAttributes 
-              params={params}
-              onParamsChange={setParams}
-              isExecuting={isExecuting}
-              onRunPython={() => runPythonRef.current?.()}
-            />
-            
-            <div className="rounded-2xl border bg-white p-4">
-              <div className="flex items-center justify-between mb-2">
-                <h3 className="font-semibold">Python Code</h3>
-                <button
-                  onClick={() => runPythonRef.current?.()}
-                  disabled={isExecuting}
-                  className="px-3 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 disabled:bg-gray-600 disabled:cursor-not-allowed transition-colors"
-                >
-                  {isExecuting ? 'Executing...' : 'Run Python'}
-                </button>
-              </div>
-              <CodeBlock 
-                code={code}
-                editable={true}
-                csvData={csvData}
-                filename={sourceFile}
-                onExecuteRef={runPythonRef}
-                onExecutingChange={setIsExecuting}
-                onResultsChange={(results, error) => {
-                  setPythonResults(results);
-                  setPythonError(error);
-                }}
-                onCodeChange={handleCodeChange}
-                dataframeContext={{ 
-                  type: 'derived', 
-                  parentDataframe: params.sourceVar,
-                  colType: 'full'
-                }}
-              />
-            </div>
-          </section>
+          <PythonWorkspace
+            initialParams={params}
+            generateCode={generateSplitCode}
+            parseCode={parseSplitCode}
+            normalizeParams={normalizeSplitPercentages}
+            AttributesComponent={SplitAttributes}
+            dataframeContext={{ 
+              type: 'derived', 
+              parentDataframe: params.sourceVar,
+              colType: 'full'
+            }}
+            csvData={csvData}
+            filename={sourceFile}
+            onParamsChange={setParams}
+            onResultsChange={(results, error) => {
+              setPythonResults(results);
+              setPythonError(error);
+            }}
+            shouldGenerateCode={!!selectedDataframeName}
+          />
         )}
 
         {/* Python Results */}

@@ -140,10 +140,19 @@ export function generateSplitCode(params: SplitParams): string {
 
 /**
  * Parse split code to extract parameters
+ * Returns complete params object with defaults for missing fields
  */
-export function parseSplitCode(code: string): Partial<SplitParams> | null {
+export function parseSplitCode(code: string): SplitParams | null {
   try {
-    const params: Partial<SplitParams> = {};
+    // Start with defaults
+    const params: SplitParams = {
+      sourceVar: 'df',
+      trainPercent: 80,
+      validationPercent: 0,
+      testPercent: 20,
+      includeValidation: false,
+      splitOrder: ['train', 'test'],
+    };
 
     // Extract source variable (the df being split)
     const sourceMatch = code.match(/total_rows\s*=\s*len\((\w+)\)/);
@@ -220,10 +229,18 @@ export function generateFeaturesTargetCode(params: FeaturesTargetParams): string
 
 /**
  * Parse features/target code to extract parameters
+ * Returns complete params object with defaults for missing fields
  */
-export function parseFeaturesTargetCode(code: string): Partial<FeaturesTargetParams> | null {
+export function parseFeaturesTargetCode(code: string): FeaturesTargetParams | null {
   try {
-    const params: Partial<FeaturesTargetParams> = {};
+    // Start with defaults
+    const params: FeaturesTargetParams = {
+      sourceVar: 'df',
+      targetColumn: '',
+      featureColumns: [],
+      featuresVarName: 'X',
+      targetVarName: 'y',
+    };
 
     // Extract source variable from feature assignment
     const sourceMatch = code.match(/=\s*(\w+)\[/);
