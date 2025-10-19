@@ -140,7 +140,7 @@ for _key in _assigned_vars:
         _value = _namespace[_key]
         print(f"[Debug] Checking {_key}, type: {type(_value)}")
         
-        # Only process DataFrames
+        # Process DataFrames
         if isinstance(_value, pd.DataFrame):
             print(f"[Debug] {_key} is a DataFrame with shape {_value.shape}")
             # Convert DataFrame to dict with 'split' orientation for easier JS consumption
@@ -153,8 +153,19 @@ for _key in _assigned_vars:
                 'data': _df_dict['data'],
                 'shape': list(_value.shape)
             }
+        # Process Series
+        elif isinstance(_value, pd.Series):
+            print(f"[Debug] {_key} is a Series with shape {_value.shape}")
+            # Convert Series to list, replacing NaN with None
+            _series_clean = _value.head(100).replace({np.nan: None})
+            _results[_key] = {
+                'type': 'series',
+                'name': _value.name if _value.name else _key,
+                'data': _series_clean.tolist(),
+                'shape': list(_value.shape)
+            }
         else:
-            print(f"[Debug] {_key} is not a DataFrame")
+            print(f"[Debug] {_key} is not a DataFrame or Series")
     else:
         print(f"[Debug] {_key} not found in namespace")
 

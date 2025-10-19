@@ -78,7 +78,9 @@ export default function FeaturesTargetPage() {
       if (isPyodideReady()) {
         const cols = await getDataframeColumns(selectedDataframeName);
         if (cols.length > 0) {
-          setAvailableColumns(cols);
+          // Deduplicate columns
+          const uniqueCols = [...new Set(cols)];
+          setAvailableColumns(uniqueCols);
         }
       }
       
@@ -94,7 +96,9 @@ export default function FeaturesTargetPage() {
               if (availableColumns.length === 0) {
                 const headerLine = lines[0];
                 const cols = headerLine.split(',').map(c => c.trim().replace(/['"]/g, ''));
-                setAvailableColumns(cols);
+                // Deduplicate columns
+                const uniqueCols = [...new Set(cols)];
+                setAvailableColumns(uniqueCols);
               }
               
               // Create preview artifact
@@ -172,6 +176,7 @@ export default function FeaturesTargetPage() {
           initialParams={params}
           generateCode={generateFeaturesTargetCode}
           parseCode={parseFeaturesTargetCode}
+          // @ts-ignore - availableColumns passed via attributesProps
           AttributesComponent={FeaturesTargetAttributes}
           attributesProps={{ availableColumns }}
           dataframeContext={{ 
@@ -226,6 +231,7 @@ export default function FeaturesTargetPage() {
                         <table className="min-w-full text-xs">
                           <thead className="bg-gray-100 sticky top-0">
                             <tr>
+                              <th className="px-2 py-1 text-left font-semibold sticky left-0 bg-gray-100 z-10">#</th>
                               {columns.map((col: string, i: number) => (
                                 <th key={i} className="px-2 py-1 text-left font-semibold whitespace-nowrap">
                                   {col}
@@ -236,6 +242,7 @@ export default function FeaturesTargetPage() {
                           <tbody>
                             {data.map((row: any[], ri: number) => (
                               <tr key={ri} className="odd:bg-white even:bg-gray-50">
+                                <td className="px-2 py-1 text-gray-500 font-medium sticky left-0 bg-inherit border-r">{ri}</td>
                                 {row.map((cell: any, ci: number) => (
                                   <td key={ci} className="px-2 py-1 whitespace-nowrap">
                                     {cell === null ? (
@@ -256,11 +263,58 @@ export default function FeaturesTargetPage() {
               </div>
             )}
 
-            {/* y DataFrame (narrower - 4 cols) */}
-            {pythonResults[params.targetVarName] && pythonResults[params.targetVarName].type === 'dataframe' && (
+            {/* y Series (narrower - 4 cols) */}
+            {pythonResults[params.targetVarName] && (
+              pythonResults[params.targetVarName].type === 'dataframe' || 
+              pythonResults[params.targetVarName].type === 'series'
+            ) && (
               <div className="col-span-4">
                 {(() => {
-                  const { columns, data, shape } = pythonResults[params.targetVarName];
+                  const result = pythonResults[params.targetVarName];
+                  
+                  // Handle Series
+                  if (result.type === 'series') {
+                    const { name, data, shape } = result;
+                    return (
+                      <div className="border rounded-lg overflow-hidden bg-white">
+                        <div className="px-4 py-2 bg-gray-50 border-b">
+                          <p className="text-sm font-medium">
+                            <code className="bg-gray-200 px-1 rounded">{params.targetVarName}</code> (target - Series)
+                            <span className="text-gray-600 ml-2">
+                              {shape[0]} values
+                            </span>
+                          </p>
+                        </div>
+                        <div className="overflow-auto max-h-96">
+                          <table className="min-w-full text-xs">
+                            <thead className="bg-gray-100 sticky top-0">
+                              <tr>
+                                <th className="px-2 py-1 text-left font-semibold bg-gray-100">#</th>
+                                <th className="px-2 py-1 text-left font-semibold">{name || 'Value'}</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {data.map((cell: any, ri: number) => (
+                                <tr key={ri} className="odd:bg-white even:bg-gray-50">
+                                  <td className="px-2 py-1 text-gray-500 font-medium border-r">{ri}</td>
+                                  <td className="px-2 py-1">
+                                    {cell === null ? (
+                                      <span className="text-gray-400 italic">null</span>
+                                    ) : (
+                                      String(cell)
+                                    )}
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    );
+                  }
+                  
+                  // Handle DataFrame
+                  const { columns, data, shape } = result;
                   return (
                     <div className="border rounded-lg overflow-hidden bg-white">
                       <div className="px-4 py-2 bg-gray-50 border-b">
