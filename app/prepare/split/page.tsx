@@ -12,19 +12,28 @@ import { isPyodideReady, verifyDataframesExist } from '@/core/python-runtime';
 import '@/plugins/prep.train_test_split';
 
 // Normalization function to ensure percentages sum to 100%
-// Detects which values changed and adjusts the others
+// Detects which values changed and only adjusts unchanged splits
 const normalizeSplitPercentages = (parsed: SplitParams, current: SplitParams): SplitParams => {
+  console.log('[Normalizer] Called with:');
+  console.log('  Parsed:', { train: parsed.trainPercent, val: parsed.validationPercent, test: parsed.testPercent });
+  console.log('  Current:', { train: current.trainPercent, val: current.validationPercent, test: current.testPercent });
+  
   const { trainPercent, validationPercent, testPercent, splitOrder } = parsed;
   const total = trainPercent + validationPercent + testPercent;
   
+  console.log('  Total:', total);
+  
   if (total === 100) {
-    return parsed; // Already correct
+    console.log('  Already 100%, no normalization needed');
+    return parsed;
   }
   
-  // Find which value(s) the user changed
+  // Detect which values the user changed by comparing to current
   const trainChanged = trainPercent !== current.trainPercent;
   const valChanged = validationPercent !== current.validationPercent;
   const testChanged = testPercent !== current.testPercent;
+  
+  console.log('  Changes detected:', { trainChanged, valChanged, testChanged });
   
   const diff = 100 - total;
   const newPercentages: Record<string, number> = {
@@ -41,21 +50,30 @@ const normalizeSplitPercentages = (parsed: SplitParams, current: SplitParams): S
     return false;
   });
   
+  console.log('  Unchanged splits:', unchangedSplits);
+  console.log('  Diff to distribute:', diff);
+  
   if (unchangedSplits.length > 0) {
-    // Distribute diff to first unchanged split
+    // Distribute diff to first unchanged split (don't touch what user edited!)
     const targetSplit = unchangedSplits[0];
+    console.log('  Adjusting unchanged split:', targetSplit, 'by', diff);
     newPercentages[targetSplit] += diff;
   } else {
-    // All were changed? Just adjust first one
+    // All were changed? Adjust first one in order
+    console.log('  All changed, adjusting first in order:', splitOrder[0]);
     newPercentages[splitOrder[0]] += diff;
   }
   
-  return {
+  const result = {
     ...parsed,
     trainPercent: Math.max(0, Math.min(100, newPercentages.train)),
     validationPercent: Math.max(0, Math.min(100, newPercentages.validation)),
     testPercent: Math.max(0, Math.min(100, newPercentages.test)),
   };
+  
+  console.log('  Result:', { train: result.trainPercent, val: result.validationPercent, test: result.testPercent });
+  
+  return result;
 };
 
 export default function SplitPage() {

@@ -66,12 +66,13 @@ export default function PythonWorkspace<TParams>({
   const [code, setCode] = useState('');
   const [isCodeManuallyEdited, setIsCodeManuallyEdited] = useState(false);
   const [isExecuting, setIsExecuting] = useState(false);
+  const [paramsBeforeEdit, setParamsBeforeEdit] = useState<TParams | null>(null);
   const runPythonRef = useRef<(() => void) | null>(null);
   
-  // Sync params changes up to parent
+  // Sync params from parent when initialParams changes (parent is source of truth)
   useEffect(() => {
-    onParamsChange?.(params);
-  }, [params, onParamsChange]);
+    setParams(initialParams);
+  }, [initialParams]);
   
   // GUI → Code: Generate when params change
   useEffect(() => {
@@ -81,26 +82,46 @@ export default function PythonWorkspace<TParams>({
     }
   }, [params, isCodeManuallyEdited, shouldGenerateCode, generateCode]);
   
-  // Code → GUI: Parse when code edited
+  // Code onChange: Parse immediately (NO normalization)
   const handleCodeChange = (newCode: string) => {
+    // Save original params on first edit
+    if (!isCodeManuallyEdited) {
+      setParamsBeforeEdit(params);
+      setIsCodeManuallyEdited(true);
+    }
+    
     setCode(newCode);
-    setIsCodeManuallyEdited(true);
     onCodeChange?.(newCode);
     
     const parsed = parseCode(newCode);
     if (parsed) {
-      const normalized = normalizeParams 
-        ? normalizeParams(parsed, params) 
-        : parsed;
-      setParams(normalized);
+      setParams(parsed);  // Direct update, no normalization
+      onParamsChange?.(parsed);
     }
-    
-    setTimeout(() => setIsCodeManuallyEdited(false), 300);
   };
   
+  // Code onBlur: Normalize after user finishes editing
+  const handleCodeBlur = () => {
+    if (!isCodeManuallyEdited || !paramsBeforeEdit) return;
+    
+    const currentParsed = parseCode(code);
+    if (currentParsed && normalizeParams) {
+      console.log('[PythonWorkspace] Normalizing on blur');
+      // Compare to params BEFORE editing started
+      const normalized = normalizeParams(currentParsed, paramsBeforeEdit);
+      setParams(normalized);
+      onParamsChange?.(normalized);
+    }
+    
+    // Reset edit state
+    setIsCodeManuallyEdited(false);
+    setParamsBeforeEdit(null);
+  };
+  
+  // Attributes onChange: Direct update (normalization already in component)
   const handleParamsChange = (newParams: TParams) => {
     setParams(newParams);
-    setIsCodeManuallyEdited(false); // GUI change resets manual flag
+    onParamsChange?.(newParams);
   };
   
   return (
@@ -135,6 +156,7 @@ export default function PythonWorkspace<TParams>({
           onExecutingChange={setIsExecuting}
           onResultsChange={onResultsChange}
           onCodeChange={handleCodeChange}
+          onCodeBlur={handleCodeBlur}
           dataframeContext={dataframeContext}
         />
       </div>

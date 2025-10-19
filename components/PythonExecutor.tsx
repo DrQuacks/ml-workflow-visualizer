@@ -20,10 +20,11 @@ interface PythonExecutorProps {
   onExecutingChange?: (isExecuting: boolean) => void;
   onResultsChange?: (results: Record<string, any> | null, error: string | null) => void;
   onCodeChange?: (code: string) => void;
+  onCodeBlur?: () => void;
   dataframeContext: DataframeContext;
 }
 
-export default function PythonExecutor({ initialCode, csvData, filename, onExecuteRef, onExecutingChange, onResultsChange, onCodeChange, dataframeContext }: PythonExecutorProps) {
+export default function PythonExecutor({ initialCode, csvData, filename, onExecuteRef, onExecutingChange, onResultsChange, onCodeChange, onCodeBlur, dataframeContext }: PythonExecutorProps) {
   const [code, setCode] = useState(initialCode);
   const [isExecuting, setIsExecuting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -111,7 +112,8 @@ export default function PythonExecutor({ initialCode, csvData, filename, onExecu
           onChange={(newCode) => {
             setCode(newCode);
             onCodeChange?.(newCode);
-          }} 
+          }}
+          onBlur={onCodeBlur}
         />
       ) : (
         <div className="p-4 bg-gray-800 text-gray-400 text-sm">

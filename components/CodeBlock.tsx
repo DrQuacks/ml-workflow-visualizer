@@ -17,10 +17,11 @@ interface CodeBlockProps {
   onExecutingChange?: (isExecuting: boolean) => void;
   onResultsChange?: (results: Record<string, any> | null, error: string | null) => void;
   onCodeChange?: (code: string) => void;
+  onCodeBlur?: () => void;
   dataframeContext?: DataframeContext;
 }
 
-export default function CodeBlock({ code, editable = false, csvData, filename, onExecuteRef, onExecutingChange, onResultsChange, onCodeChange, dataframeContext }: CodeBlockProps) {
+export default function CodeBlock({ code, editable = false, csvData, filename, onExecuteRef, onExecutingChange, onResultsChange, onCodeChange, onCodeBlur, dataframeContext }: CodeBlockProps) {
   if (editable) {
     return <PythonExecutor 
       initialCode={code} 
@@ -30,6 +31,7 @@ export default function CodeBlock({ code, editable = false, csvData, filename, o
       onExecutingChange={onExecutingChange}
       onResultsChange={onResultsChange}
       onCodeChange={onCodeChange}
+      onCodeBlur={onCodeBlur}
       dataframeContext={dataframeContext || { type: 'source' }}
     />;
   }

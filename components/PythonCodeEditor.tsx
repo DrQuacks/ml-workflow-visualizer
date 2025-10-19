@@ -7,6 +7,7 @@ import { vscodeDark } from '@uiw/codemirror-theme-vscode';
 interface PythonCodeEditorProps {
   code: string;
   onChange?: (value: string) => void;
+  onBlur?: () => void;
   readOnly?: boolean;
   height?: string;
 }
@@ -14,6 +15,7 @@ interface PythonCodeEditorProps {
 export default function PythonCodeEditor({
   code,
   onChange,
+  onBlur,
   readOnly = false,
   height = '300px',
 }: PythonCodeEditorProps) {
@@ -24,6 +26,7 @@ export default function PythonCodeEditor({
       extensions={[python()]}
       theme={vscodeDark}
       onChange={onChange}
+      onBlur={onBlur}
       editable={!readOnly}
       basicSetup={{
         lineNumbers: true,
