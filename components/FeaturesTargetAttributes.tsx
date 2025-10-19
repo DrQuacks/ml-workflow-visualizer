@@ -33,6 +33,9 @@ export default function FeaturesTargetAttributes({
   };
 
   const removeFeatureColumn = (index: number) => {
+    // Don't allow removing if only one feature column left
+    if (featureColumns.length <= 1) return;
+    
     onParamsChange({
       ...params,
       featureColumns: featureColumns.filter((_, i) => i !== index)
@@ -119,7 +122,8 @@ export default function FeaturesTargetAttributes({
                 </select>
                 <button
                   onClick={() => removeFeatureColumn(idx)}
-                  className="text-xs text-red-600 hover:text-red-800 px-2 py-1 hover:bg-red-50 rounded"
+                  disabled={featureColumns.length <= 1}
+                  className="text-xs text-red-600 hover:text-red-800 px-2 py-1 hover:bg-red-50 rounded disabled:opacity-30 disabled:cursor-not-allowed"
                 >
                   Remove
                 </button>

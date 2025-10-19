@@ -61,6 +61,17 @@ export default function FeaturesTargetPage() {
     }
   }, [selectedDataframeName]);
 
+  // Initialize with at least one feature column when columns become available
+  useEffect(() => {
+    if (availableColumns.length > 0 && params.featureColumns.length === 0) {
+      // Find first column that's not the target
+      const firstAvailable = availableColumns.find(c => c !== params.targetColumn);
+      if (firstAvailable) {
+        setParams(prev => ({ ...prev, featureColumns: [firstAvailable] }));
+      }
+    }
+  }, [availableColumns, params.featureColumns.length, params.targetColumn]);
+
   // Get source file and load CSV data
   const sourceDataframe = createdDataframes.find(df => df.name === selectedDataframeName);
   const sourceFile = sourceDataframe?.sourceFile;
@@ -231,7 +242,7 @@ export default function FeaturesTargetPage() {
                         <table className="min-w-full text-xs">
                           <thead className="bg-gray-100 sticky top-0">
                             <tr>
-                              <th className="px-2 py-1 text-left font-semibold sticky left-0 bg-gray-100 z-10">#</th>
+                              <th className="px-1 py-1 text-left font-semibold sticky left-0 bg-gray-100 z-10 w-12 text-xs">index</th>
                               {columns.map((col: string, i: number) => (
                                 <th key={i} className="px-2 py-1 text-left font-semibold whitespace-nowrap">
                                   {col}
@@ -242,7 +253,7 @@ export default function FeaturesTargetPage() {
                           <tbody>
                             {data.map((row: any[], ri: number) => (
                               <tr key={ri} className="odd:bg-white even:bg-gray-50">
-                                <td className="px-2 py-1 text-gray-500 font-medium sticky left-0 bg-inherit border-r">{ri}</td>
+                                <td className="px-1 py-1 text-gray-500 font-medium sticky left-0 bg-inherit border-r text-xs">{ri}</td>
                                 {row.map((cell: any, ci: number) => (
                                   <td key={ci} className="px-2 py-1 whitespace-nowrap">
                                     {cell === null ? (
@@ -289,14 +300,14 @@ export default function FeaturesTargetPage() {
                           <table className="min-w-full text-xs">
                             <thead className="bg-gray-100 sticky top-0">
                               <tr>
-                                <th className="px-2 py-1 text-left font-semibold bg-gray-100">#</th>
+                                <th className="px-1 py-1 text-left font-semibold bg-gray-100 w-12 text-xs">index</th>
                                 <th className="px-2 py-1 text-left font-semibold">{name || 'Value'}</th>
                               </tr>
                             </thead>
                             <tbody>
                               {data.map((cell: any, ri: number) => (
                                 <tr key={ri} className="odd:bg-white even:bg-gray-50">
-                                  <td className="px-2 py-1 text-gray-500 font-medium border-r">{ri}</td>
+                                  <td className="px-1 py-1 text-gray-500 font-medium border-r text-xs">{ri}</td>
                                   <td className="px-2 py-1">
                                     {cell === null ? (
                                       <span className="text-gray-400 italic">null</span>
