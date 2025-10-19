@@ -52,8 +52,8 @@ export async function initPyodide(): Promise<PyodideInterface> {
         indexURL: 'https://cdn.jsdelivr.net/pyodide/v0.24.1/full/',
       });
 
-      console.log('[Pyodide] Loading packages: pandas, numpy...');
-      await pyodide.loadPackage(['pandas', 'numpy']);
+      console.log('[Pyodide] Loading packages: pandas, numpy, scikit-learn...');
+      await pyodide.loadPackage(['pandas', 'numpy', 'scikit-learn']);
       
       pyodideInstance = pyodide;
       console.log('[Pyodide] Ready!');
@@ -164,8 +164,28 @@ for _key in _assigned_vars:
                 'data': _series_clean.tolist(),
                 'shape': list(_value.shape)
             }
+        # Process numpy arrays
+        elif isinstance(_value, np.ndarray):
+            print(f"[Debug] {_key} is a numpy array with shape {_value.shape}")
+            # Convert numpy array to list, handling different dtypes
+            if _value.dtype.kind == 'f':  # float
+                _array_clean = np.nan_to_num(_value, nan=None).tolist()
+            elif _value.dtype.kind in ('i', 'u', 'b'):  # int, uint, bool
+                _array_clean = _value.tolist()
+            else:  # object or other types
+                _array_clean = _value.tolist()  # Direct conversion, no nan handling
+            _results[_key] = {
+                'type': 'array',
+                'data': _array_clean,
+                'shape': list(_value.shape),
+                'dtype': str(_value.dtype)
+            }
+        # Process scalar values (int, float, etc.)
+        elif isinstance(_value, (int, float, bool, str)):
+            print(f"[Debug] {_key} is a scalar: {type(_value)}")
+            _results[_key] = _value
         else:
-            print(f"[Debug] {_key} is not a DataFrame or Series")
+            print(f"[Debug] {_key} is not a DataFrame, Series, array, or scalar: {type(_value)}")
     else:
         print(f"[Debug] {_key} not found in namespace")
 
@@ -194,8 +214,11 @@ export async function verifyDataframesExist(names: string[]): Promise<string[]> 
 import json
 existing = []
 for name in ${JSON.stringify(names)}:
-    if name in globals() and hasattr(globals()[name], 'columns'):
-        existing.append(name)
+    if name in globals():
+        _obj = globals()[name]
+        # Check for DataFrame (has columns) or Series (has index and dtype)
+        if hasattr(_obj, 'columns') or (hasattr(_obj, 'index') and hasattr(_obj, 'dtype')):
+            existing.append(name)
 json.dumps(existing)
 `);
     return JSON.parse(result || '[]');

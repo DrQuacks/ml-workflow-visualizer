@@ -59,9 +59,9 @@ export default function PythonExecutor({ initialCode, csvData, filename, onExecu
       setResults(output);
       onResultsChange?.(output, null);
       
-      // Save DataFrame metadata to state with context
+      // Save DataFrame and Series metadata to state with context
       Object.entries(output).forEach(([name, value]: [string, any]) => {
-        if (value && value.type === 'dataframe') {
+        if (value && (value.type === 'dataframe' || value.type === 'series')) {
           // Determine colType from map or default
           let colType: 'full' | 'features' | 'target' = 'full';
           if (dataframeContext.colTypeMap && dataframeContext.colTypeMap[name]) {
@@ -70,6 +70,7 @@ export default function PythonExecutor({ initialCode, csvData, filename, onExecu
             colType = dataframeContext.colType;
           }
           
+          console.log('[PythonExecutor] Saving dataframe:', name, 'with colType:', colType, 'from context:', dataframeContext);
           addCreatedDataframe({
             name,
             sourceFile: filename || 'unknown',
@@ -88,7 +89,7 @@ export default function PythonExecutor({ initialCode, csvData, filename, onExecu
       setIsExecuting(false);
       onExecutingChange?.(false);
     }
-  }, [code, csvData, filename, addCreatedDataframe, onExecutingChange, onResultsChange]);
+  }, [code, csvData, filename, dataframeContext, addCreatedDataframe, onExecutingChange, onResultsChange]);
 
   // Expose execute function to parent via ref
   useEffect(() => {

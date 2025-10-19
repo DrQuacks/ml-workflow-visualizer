@@ -24,12 +24,18 @@ const menuItems: MenuItem[] = [
       { label: 'Split', href: '/prepare/split' },
       { label: 'Features and Target', href: '/prepare/features-target' }
     ]
+  },
+  {
+    label: 'Model',
+    children: [
+      { label: 'Linear Regression', href: '/model/linear-regression' }
+    ]
   }
 ];
 
 export default function Sidebar() {
   const { isOpen, setIsOpen } = useSidebar();
-  const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(['Load', 'Prepare']));
+  const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(['Load', 'Prepare', 'Model']));
   const pathname = usePathname();
 
   const toggleSection = (label: string) => {

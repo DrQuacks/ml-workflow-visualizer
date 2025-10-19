@@ -276,6 +276,82 @@ export function parseFeaturesTargetCode(code: string): FeaturesTargetParams | nu
   }
 }
 
+export interface LinearRegressionParams {
+  featuresVar: string;
+  targetVar: string;
+  modelVar: string;
+  fitIntercept: boolean;
+}
+
+/**
+ * Generate linear regression training code from parameters
+ */
+export function generateLinearRegressionCode(params: LinearRegressionParams): string {
+  const { featuresVar, targetVar, modelVar, fitIntercept } = params;
+  
+  const lines = [
+    'from sklearn.linear_model import LinearRegression',
+    'from sklearn.metrics import r2_score',
+    'import numpy as np',
+    '',
+    '# Train linear regression model',
+    `${modelVar} = LinearRegression(fit_intercept=${fitIntercept ? 'True' : 'False'})`,
+    `${modelVar}.fit(${featuresVar}, ${targetVar})`,
+    '',
+    '# Model coefficients and intercept',
+    `coefficients = ${modelVar}.coef_`,
+    `intercept = ${modelVar}.intercept_ if ${fitIntercept ? 'True' : 'False'} else 0`,
+    '',
+    '# Make predictions on training data',
+    `predictions = ${modelVar}.predict(${featuresVar})`,
+    '',
+    '# Calculate R² score',
+    `r2 = r2_score(${targetVar}, predictions)`
+  ];
+  
+  return lines.join('\n');
+}
+
+/**
+ * Parse linear regression code to extract parameters
+ * Returns complete params object with defaults for missing fields
+ */
+export function parseLinearRegressionCode(code: string): LinearRegressionParams | null {
+  try {
+    // Start with defaults
+    const params: LinearRegressionParams = {
+      featuresVar: 'X',
+      targetVar: 'y',
+      modelVar: 'model',
+      fitIntercept: true,
+    };
+
+    // Extract model variable name
+    const modelMatch = code.match(/^(\w+)\s*=\s*LinearRegression\(/m);
+    if (modelMatch) {
+      params.modelVar = modelMatch[1];
+    }
+
+    // Extract fit_intercept parameter
+    const fitInterceptMatch = code.match(/fit_intercept\s*=\s*(True|False)/);
+    if (fitInterceptMatch) {
+      params.fitIntercept = fitInterceptMatch[1] === 'True';
+    }
+
+    // Extract features variable from .fit() call
+    const fitMatch = code.match(/\.fit\((\w+),\s*(\w+)\)/);
+    if (fitMatch) {
+      params.featuresVar = fitMatch[1];
+      params.targetVar = fitMatch[2];
+    }
+
+    return params;
+  } catch (error) {
+    console.error('Failed to parse linear regression code:', error);
+    return null;
+  }
+}
+
 /**
  * Helper: Format Python boolean value
  */
@@ -306,4 +382,3 @@ export function extractBoolArg(code: string, argName: string): boolean | null {
   if (!match) return null;
   return parsePythonBool(match[1]);
 }
-
