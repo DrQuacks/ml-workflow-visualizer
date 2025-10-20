@@ -22,7 +22,8 @@ const menuItems: MenuItem[] = [
     label: 'Prepare',
     children: [
       { label: 'Split', href: '/prepare/split' },
-      { label: 'Features and Target', href: '/prepare/features-target' }
+      { label: 'Features and Target', href: '/prepare/features-target' },
+      { label: 'Clean Data', href: '/prepare/clean' }
     ]
   },
   {

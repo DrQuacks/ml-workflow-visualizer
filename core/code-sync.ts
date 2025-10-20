@@ -382,3 +382,193 @@ export function extractBoolArg(code: string, argName: string): boolean | null {
   if (!match) return null;
   return parsePythonBool(match[1]);
 }
+
+/**
+ * Inspection parameters for data exploration
+ */
+export interface InspectionParams {
+  sourceVar: string;
+  showDescribe: boolean;
+  showHead: boolean;
+  showDtypes: boolean;
+  headRows: number;
+}
+
+/**
+ * Generate inspection code for viewing data details
+ */
+export function generateInspectionCode(params: InspectionParams): string {
+  const { sourceVar, showDescribe, showHead, showDtypes, headRows } = params;
+  const lines = ['import pandas as pd', ''];
+  
+  if (showDtypes) {
+    lines.push('# Data types');
+    lines.push(`dtypes = ${sourceVar}.dtypes`);
+    lines.push('');
+  }
+  
+  if (showHead) {
+    lines.push('# First rows');
+    lines.push(`head = ${sourceVar}.head(${headRows})`);
+    lines.push('');
+  }
+  
+  if (showDescribe) {
+    lines.push('# Statistical summary');
+    lines.push(`describe = ${sourceVar}.describe()`);
+  }
+  
+  return lines.join('\n');
+}
+
+/**
+ * Parse inspection code to extract parameters
+ */
+export function parseInspectionCode(code: string): InspectionParams | null {
+  try {
+    const params: InspectionParams = {
+      sourceVar: 'df',
+      showDescribe: false,
+      showHead: false,
+      showDtypes: false,
+      headRows: 5,
+    };
+
+    // Check for dtypes
+    const dtypesMatch = code.match(/dtypes\s*=\s*(\w+)\.dtypes/);
+    if (dtypesMatch) {
+      params.showDtypes = true;
+      params.sourceVar = dtypesMatch[1];
+    }
+
+    // Check for head
+    const headMatch = code.match(/head\s*=\s*(\w+)\.head\((\d+)\)/);
+    if (headMatch) {
+      params.showHead = true;
+      params.sourceVar = headMatch[1];
+      params.headRows = parseInt(headMatch[2]);
+    }
+
+    // Check for describe
+    const describeMatch = code.match(/describe\s*=\s*(\w+)\.describe\(\)/);
+    if (describeMatch) {
+      params.showDescribe = true;
+      params.sourceVar = describeMatch[1];
+    }
+
+    return params;
+  } catch (error) {
+    console.error('Failed to parse inspection code:', error);
+    return null;
+  }
+}
+
+/**
+ * Clean data parameters
+ */
+export interface CleanDataParams {
+  sourceVar: string;
+  column: string;
+  operation: 'dtype' | 'fill' | 'drop';
+  targetDtype?: string;
+  fillStrategy?: 'mean' | 'median' | 'mode' | 'ffill' | 'bfill' | 'constant';
+  fillValue?: string;
+  outputVar: string;
+}
+
+/**
+ * Generate cleaning code based on operation
+ */
+export function generateCleanDataCode(params: CleanDataParams): string {
+  const { sourceVar, column, operation, targetDtype, fillStrategy, fillValue, outputVar } = params;
+  
+  const lines = ['import pandas as pd', 'import numpy as np', ''];
+  lines.push(`# Clean data: ${operation} on column '${column}'`);
+  lines.push(`${outputVar} = ${sourceVar}.copy()`);
+  lines.push('');
+  
+  if (operation === 'dtype' && targetDtype) {
+    lines.push(`# Convert column '${column}' to ${targetDtype}`);
+    lines.push(`${outputVar}['${column}'] = ${outputVar}['${column}'].astype('${targetDtype}')`);
+  } else if (operation === 'fill' && fillStrategy) {
+    lines.push(`# Fill missing values in '${column}' using ${fillStrategy}`);
+    if (fillStrategy === 'mean') {
+      lines.push(`${outputVar}['${column}'].fillna(${outputVar}['${column}'].mean(), inplace=True)`);
+    } else if (fillStrategy === 'median') {
+      lines.push(`${outputVar}['${column}'].fillna(${outputVar}['${column}'].median(), inplace=True)`);
+    } else if (fillStrategy === 'mode') {
+      lines.push(`${outputVar}['${column}'].fillna(${outputVar}['${column}'].mode()[0], inplace=True)`);
+    } else if (fillStrategy === 'ffill') {
+      lines.push(`${outputVar}['${column}'].fillna(method='ffill', inplace=True)`);
+    } else if (fillStrategy === 'bfill') {
+      lines.push(`${outputVar}['${column}'].fillna(method='bfill', inplace=True)`);
+    } else if (fillStrategy === 'constant' && fillValue) {
+      lines.push(`${outputVar}['${column}'].fillna(${fillValue}, inplace=True)`);
+    }
+  } else if (operation === 'drop') {
+    lines.push(`# Drop rows with missing values in '${column}'`);
+    lines.push(`${outputVar} = ${outputVar}.dropna(subset=['${column}'])`);
+  }
+  
+  return lines.join('\n');
+}
+
+/**
+ * Parse cleaning code to extract parameters
+ */
+export function parseCleanDataCode(code: string): CleanDataParams | null {
+  try {
+    const params: CleanDataParams = {
+      sourceVar: 'df',
+      column: '',
+      operation: 'dtype',
+      outputVar: 'df_clean',
+    };
+
+    // Extract output var
+    const outputMatch = code.match(/^(\w+)\s*=\s*(\w+)\.copy\(\)/m);
+    if (outputMatch) {
+      params.outputVar = outputMatch[1];
+      params.sourceVar = outputMatch[2];
+    }
+
+    // Check operation type
+    if (code.includes('.astype(')) {
+      params.operation = 'dtype';
+      const dtypeMatch = code.match(/\['([^']+)'\]\.astype\('([^']+)'\)/);
+      if (dtypeMatch) {
+        params.column = dtypeMatch[1];
+        params.targetDtype = dtypeMatch[2];
+      }
+    } else if (code.includes('.fillna(')) {
+      params.operation = 'fill';
+      const colMatch = code.match(/\['([^']+)'\]\.fillna\(/);
+      if (colMatch) {
+        params.column = colMatch[1];
+      }
+      
+      if (code.includes('.mean()')) {
+        params.fillStrategy = 'mean';
+      } else if (code.includes('.median()')) {
+        params.fillStrategy = 'median';
+      } else if (code.includes('.mode()')) {
+        params.fillStrategy = 'mode';
+      } else if (code.includes("method='ffill'")) {
+        params.fillStrategy = 'ffill';
+      } else if (code.includes("method='bfill'")) {
+        params.fillStrategy = 'bfill';
+      }
+    } else if (code.includes('.dropna(')) {
+      params.operation = 'drop';
+      const dropMatch = code.match(/\.dropna\(subset=\['([^']+)'\]\)/);
+      if (dropMatch) {
+        params.column = dropMatch[1];
+      }
+    }
+
+    return params;
+  } catch (error) {
+    console.error('Failed to parse clean data code:', error);
+    return null;
+  }
+}
