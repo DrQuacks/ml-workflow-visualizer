@@ -2,6 +2,7 @@
 
 import { useStore } from '@/core/state';
 import { registry } from '@/core/registry';
+import type { ArtifactType } from '@/core/types';
 
 type Props = { nodeId: string };
 
@@ -14,12 +15,12 @@ export default function Inspector({ nodeId }: Props) {
 
   const op = registry.ops.get(node.op);
   async function rePreview() {
-    if (!op) return;
+    if (!op || !node) return;
     // clear previous outputs
     node.outputs = [];
     const ctx = {
       getArtifact: (id: string) => useStore.getState().artifacts[id],
-      emitArtifact: (art: { id?: string; type: string; payload: unknown }) => {
+      emitArtifact: (art: { id?: string; type: ArtifactType; payload: unknown }) => {
         const id = art.id ?? crypto.randomUUID();
         setArtifacts({ [id]: { id, type: art.type, payload: art.payload } });
         node.outputs.push(id);
@@ -38,6 +39,7 @@ export default function Inspector({ nodeId }: Props) {
   }
 
   function onParamChange(k: string, v: any) {
+    if (!node) return;
     const newParams = node.params.map(p => p.key === k ? { ...p, value: v } : p);
     updateNode(node.id, { params: newParams, code: op?.codegen(paramsToObj(newParams))! });
   }

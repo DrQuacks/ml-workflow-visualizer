@@ -1,8 +1,8 @@
-import type { ArtifactRef, OpId } from './types';
+import type { ArtifactRef, ArtifactType, OpId } from './types';
 
 export interface OpContext {
   getArtifact: (id: string) => unknown;
-  emitArtifact: (artifact: { id?: string; type: string; payload: unknown }) => string;
+  emitArtifact: (artifact: { id?: string; type: ArtifactType; payload: unknown }) => string;
   log: (msg: string) => void;
 }
 

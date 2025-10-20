@@ -7,7 +7,7 @@ interface CleanDataAttributesProps {
   onParamsChange: (params: CleanDataParams) => void;
   isExecuting: boolean;
   onRunPython: () => void;
-  availableColumns: string[];
+  availableColumns?: string[];
 }
 
 export default function CleanDataAttributes({
@@ -15,7 +15,7 @@ export default function CleanDataAttributes({
   onParamsChange,
   isExecuting,
   onRunPython,
-  availableColumns
+  availableColumns = []
 }: CleanDataAttributesProps) {
   const updateParam = <K extends keyof CleanDataParams>(
     key: K,
