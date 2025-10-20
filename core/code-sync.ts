@@ -142,10 +142,10 @@ export function generateSplitCode(params: SplitParams): string {
  * Parse split code to extract parameters
  * Returns complete params object with defaults for missing fields
  */
-export function parseSplitCode(code: string): SplitParams | null {
+export function parseSplitCode(code: string, currentParams?: SplitParams): SplitParams | null {
   try {
-    // Start with defaults
-    const params: SplitParams = {
+    // Start with current params as defaults, or use defaults if not provided
+    const params: SplitParams = currentParams ? { ...currentParams } : {
       sourceVar: 'df',
       trainPercent: 80,
       validationPercent: 0,

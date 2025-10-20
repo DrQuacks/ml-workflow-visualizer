@@ -93,7 +93,8 @@ export default function PythonWorkspace<TParams>({
     setCode(newCode);
     onCodeChange?.(newCode);
     
-    const parsed = parseCode(newCode);
+    // Pass current params as fallback to preserve values during partial edits
+    const parsed = (parseCode as any)(newCode, params);
     if (parsed) {
       setParams(parsed);  // Direct update, no normalization
       onParamsChange?.(parsed);
@@ -104,16 +105,21 @@ export default function PythonWorkspace<TParams>({
   const handleCodeBlur = () => {
     if (!isCodeManuallyEdited || !paramsBeforeEdit) return;
     
-    const currentParsed = parseCode(code);
+    // Pass paramsBeforeEdit as fallback to preserve values during parsing
+    const currentParsed = (parseCode as any)(code, paramsBeforeEdit);
     if (currentParsed && normalizeParams) {
       console.log('[PythonWorkspace] Normalizing on blur');
       // Compare to params BEFORE editing started
       const normalized = normalizeParams(currentParsed, paramsBeforeEdit);
       setParams(normalized);
       onParamsChange?.(normalized);
+      
+      // Regenerate code from normalized params to keep everything in sync
+      const normalizedCode = generateCode(normalized);
+      setCode(normalizedCode);
     }
     
-    // Reset edit state
+    // Reset edit state after regeneration
     setIsCodeManuallyEdited(false);
     setParamsBeforeEdit(null);
   };
