@@ -15,14 +15,16 @@ interface SplitAttributesProps {
 interface DraggableRowProps {
   index: number;
   splitName: string;
+  displayName: string;
   percent: number;
   moveRow: (dragIndex: number, hoverIndex: number) => void;
   onPercentChange: (splitName: string, value: number) => void;
+  onNameChange: (splitName: string, newName: string) => void;
 }
 
 const DRAG_TYPE = 'SPLIT_ROW';
 
-function DraggableRow({ index, splitName, percent, moveRow, onPercentChange }: DraggableRowProps) {
+function DraggableRow({ index, splitName, displayName, percent, moveRow, onPercentChange, onNameChange }: DraggableRowProps) {
   const ref = useRef<HTMLDivElement>(null);
   const dragRef = useRef<HTMLDivElement>(null);
 
@@ -83,7 +85,13 @@ function DraggableRow({ index, splitName, percent, moveRow, onPercentChange }: D
         </svg>
       </div>
       
-      <span className="text-sm capitalize font-medium w-20 flex-shrink-0">{splitName}</span>
+      <input
+        type="text"
+        value={displayName}
+        onChange={(e) => onNameChange(splitName, e.target.value)}
+        className="text-sm font-medium w-28 flex-shrink-0 border rounded px-2 py-1 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+        placeholder={splitName}
+      />
       
       <input
         type="range"
@@ -100,7 +108,7 @@ function DraggableRow({ index, splitName, percent, moveRow, onPercentChange }: D
 }
 
 export default function SplitAttributes({ params, onParamsChange, isExecuting, onRunPython }: SplitAttributesProps) {
-  const { includeValidation, trainPercent, validationPercent, testPercent, splitOrder } = params;
+  const { includeValidation, trainPercent, validationPercent, testPercent, splitOrder, trainName = 'train_df', validationName = 'validation_df', testName = 'test_df' } = params;
 
   const handlePercentChange = (splitName: string, value: number) => {
     const newValue = Math.max(0, Math.min(100, value));
@@ -150,6 +158,19 @@ export default function SplitAttributes({ params, onParamsChange, isExecuting, o
     const [removed] = newOrder.splice(dragIndex, 1);
     newOrder.splice(hoverIndex, 0, removed);
     onParamsChange({ ...params, splitOrder: newOrder });
+  };
+
+  const handleNameChange = (splitType: string, newName: string) => {
+    const updates: Partial<SplitParams> = {};
+    if (splitType === 'train') {
+      updates.trainName = newName;
+    } else if (splitType === 'validation') {
+      updates.validationName = newName;
+    } else if (splitType === 'test') {
+      updates.testName = newName;
+    }
+    
+    onParamsChange({ ...params, ...updates });
   };
 
   const handleValidationToggle = (checked: boolean) => {
@@ -221,14 +242,20 @@ export default function SplitAttributes({ params, onParamsChange, isExecuting, o
                 : splitName === 'validation' ? validationPercent 
                 : testPercent;
               
+              const displayName = splitName === 'train' ? trainName
+                : splitName === 'validation' ? validationName
+                : testName;
+              
               return (
                 <DraggableRow
                   key={splitName}
                   index={index}
                   splitName={splitName}
+                  displayName={displayName}
                   percent={percent}
                   moveRow={moveRow}
                   onPercentChange={handlePercentChange}
+                  onNameChange={handleNameChange}
                 />
               );
             })}

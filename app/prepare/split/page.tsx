@@ -86,7 +86,10 @@ export default function SplitPage() {
     trainPercent: 80,
     validationPercent: 0,
     testPercent: 20,
-    splitOrder: ['train', 'test']
+    splitOrder: ['train', 'test'],
+    trainName: 'train_df',
+    validationName: 'validation_df',
+    testName: 'test_df'
   });
   const [csvData, setCsvData] = useState<string | undefined>(undefined);
   const [pythonResults, setPythonResults] = useState<Record<string, any> | null>(null);

@@ -75,13 +75,26 @@ export interface SplitParams {
   testPercent: number;
   includeValidation: boolean;
   splitOrder: string[];
+  trainName?: string;
+  validationName?: string;
+  testName?: string;
 }
 
 /**
  * Generate split Python code from parameters
  */
 export function generateSplitCode(params: SplitParams): string {
-  const { sourceVar, trainPercent, validationPercent, testPercent, includeValidation, splitOrder } = params;
+  const { 
+    sourceVar, 
+    trainPercent, 
+    validationPercent, 
+    testPercent, 
+    includeValidation, 
+    splitOrder,
+    trainName = 'train_df',
+    validationName = 'validation_df',
+    testName = 'test_df'
+  } = params;
   
   const lines = ['import pandas as pd', ''];
   
@@ -123,15 +136,24 @@ export function generateSplitCode(params: SplitParams): string {
   
   // Generate dataframe splits
   lines.push('# Create split dataframes');
+  
+  // Map split type to custom name
+  const nameMap: Record<string, string> = {
+    train: trainName,
+    validation: validationName,
+    test: testName,
+  };
+  
   order.forEach((splitName, idx) => {
+    const customName = nameMap[splitName] || splitName;
     if (idx === 0) {
-      lines.push(`${splitName}_df = ${sourceVar}.iloc[0:${splitName}_end]`);
+      lines.push(`${customName} = ${sourceVar}.iloc[0:${splitName}_end]`);
     } else if (idx === order.length - 1) {
       const prevSplit = order[idx - 1];
-      lines.push(`${splitName}_df = ${sourceVar}.iloc[${prevSplit}_end:]`);
+      lines.push(`${customName} = ${sourceVar}.iloc[${prevSplit}_end:]`);
     } else {
       const prevSplit = order[idx - 1];
-      lines.push(`${splitName}_df = ${sourceVar}.iloc[${prevSplit}_end:${splitName}_end]`);
+      lines.push(`${customName} = ${sourceVar}.iloc[${prevSplit}_end:${splitName}_end]`);
     }
   });
   
@@ -152,6 +174,9 @@ export function parseSplitCode(code: string, currentParams?: SplitParams): Split
       testPercent: 20,
       includeValidation: false,
       splitOrder: ['train', 'test'],
+      trainName: 'train_df',
+      validationName: 'validation_df',
+      testName: 'test_df',
     };
 
     // Extract source variable (the df being split)
@@ -180,10 +205,50 @@ export function parseSplitCode(code: string, currentParams?: SplitParams): Split
       params.testPercent = Math.round(parseFloat(testMatch[1]) * 100);
     }
 
-    // Extract split order from the order of _df assignments
-    const dfAssignments = [...code.matchAll(/(\w+)_df\s*=/g)];
+    // Extract split order AND custom names from dataframe assignments
+    // Match pattern: variable_name = df.iloc[...]
+    const dfAssignments = [...code.matchAll(/(\w+)\s*=\s*\w+\.iloc\[/g)];
     if (dfAssignments.length > 0) {
-      params.splitOrder = dfAssignments.map(m => m[1]);
+      const names = dfAssignments.map(m => m[1]);
+      
+      // Determine which is which based on the iloc pattern
+      names.forEach((name, idx) => {
+        if (idx === 0) {
+          // First one is always train
+          params.trainName = name;
+          if (!params.splitOrder.includes('train')) {
+            params.splitOrder[idx] = 'train';
+          }
+        } else if (idx === 1) {
+          // Second could be validation or test
+          if (names.length === 3) {
+            // Has validation
+            params.validationName = name;
+            if (!params.splitOrder.includes('validation')) {
+              params.splitOrder[idx] = 'validation';
+            }
+          } else {
+            // No validation, this is test
+            params.testName = name;
+            if (!params.splitOrder.includes('test')) {
+              params.splitOrder[idx] = 'test';
+            }
+          }
+        } else if (idx === 2) {
+          // Third is always test
+          params.testName = name;
+          if (!params.splitOrder.includes('test')) {
+            params.splitOrder[idx] = 'test';
+          }
+        }
+      });
+      
+      // Update splitOrder to reflect actual order from code
+      if (names.length === 2) {
+        params.splitOrder = ['train', 'test'];
+      } else if (names.length === 3) {
+        params.splitOrder = ['train', 'validation', 'test'];
+      }
     }
 
     return params;
