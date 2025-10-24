@@ -118,6 +118,7 @@ export default function CleanDataPage() {
             dataframeContext={{ type: 'derived', colType: 'full' }}
             onParamsChange={setInspectionParams}
             onResultsChange={(results, error) => {
+              console.log('[Clean Data] Inspection results:', results);
               setInspectionResults(results);
             }}
             shouldGenerateCode={!!selectedDataframeName}
@@ -252,6 +253,7 @@ export default function CleanDataPage() {
             }}
             onParamsChange={setCleanParams}
             onResultsChange={(results, error) => {
+              console.log('[Clean Data] Clean results:', results);
               setCleanResults(results);
               setCleanError(error);
             }}

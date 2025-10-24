@@ -151,6 +151,7 @@ for _key in _assigned_vars:
                 'type': 'dataframe',
                 'columns': _df_dict['columns'],
                 'data': _df_dict['data'],
+                'index': _df_dict['index'],  # Include row index
                 'shape': list(_value.shape)
             }
         # Process Series
@@ -161,7 +162,8 @@ for _key in _assigned_vars:
             _results[_key] = {
                 'type': 'series',
                 'name': _value.name if _value.name else _key,
-                'data': _series_clean.tolist(),
+                'data': [str(x) for x in _series_clean.tolist()],  # Convert to strings for JSON
+                'index': _series_clean.index.tolist() if hasattr(_series_clean.index, 'tolist') else list(_series_clean.index),  # Include index
                 'shape': list(_value.shape)
             }
         # Process numpy arrays
@@ -180,12 +182,8 @@ for _key in _assigned_vars:
                 'shape': list(_value.shape),
                 'dtype': str(_value.dtype)
             }
-        # Process scalar values (int, float, etc.)
-        elif isinstance(_value, (int, float, bool, str)):
-            print(f"[Debug] {_key} is a scalar: {type(_value)}")
-            _results[_key] = _value
         else:
-            print(f"[Debug] {_key} is not a DataFrame, Series, array, or scalar: {type(_value)}")
+            print(f"[Debug] {_key} is not a DataFrame, Series, or array: {type(_value)}")
     else:
         print(f"[Debug] {_key} not found in namespace")
 
